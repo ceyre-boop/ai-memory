@@ -1,0 +1,16 @@
+{
+  "name": "portable-ai-memory",
+  "version": "0.1.0",
+  "created": "2026-09-13",
+  "description": "Portable long-term memory store. Lives anywhere (internal, external SSD, card). Loaded into RAM at session start.",
+  "layout": {
+    "corpus/": "source documents - markdown, text, transcripts",
+    "embeddings/": "vector index built from corpus",
+    "scripts/": "ingest + query"
+  },
+  "stats": {
+    "documents": 2,
+    "chunks": 2,
+    "last_indexed": "2026-09-13T20:15:19.737Z"
+  }
+}
