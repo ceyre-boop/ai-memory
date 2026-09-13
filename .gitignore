@@ -1,0 +1,10 @@
+# the store itself — ciphertext, but never in git
+embeddings/
+# user inbox — plaintext, user-managed
+corpus/
+# secrets
+.env
+*.key
+# runtime
+node_modules/
+.DS_Store
