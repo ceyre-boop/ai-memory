@@ -128,10 +128,12 @@ function copyAllowlisted(source: string, destination: string, prune: boolean, sc
     const from = join(source, entry);
     if (!existsSync(from)) continue;
     const isDir = statSync(from).isDirectory();
-    const options = ["-a", "--delete"];
+    // --inplace: write the destination file directly instead of temp-file-then-rename;
+    // the rename step fails on exFAT/FAT media under macOS rsync.
+    const options = ["-a", "--delete", "--inplace"];
     for (const exclude of EXCLUDES) options.push("--exclude", exclude);
     if (isDir) runCommand("rsync", [...options, withTrailingSlash(from), withTrailingSlash(join(destination, entry))]);
-    else runCommand("rsync", ["-a", from, join(destination, entry)]);
+    else runCommand("rsync", ["-a", "--inplace", from, join(destination, entry)]);
   }
   if (prune) {
     for (const entry of readdirSync(destination)) {
