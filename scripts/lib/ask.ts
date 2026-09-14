@@ -195,6 +195,92 @@ export interface AskResult {
   stop_reason?: string;
 }
 
+// Character contract, contradiction mode: surface conflicts, never adjudicate
+// them. A contradiction is the same specific claim asserted incompatibly at
+// two different times — not an evolving plan, not two compatible facts, not
+// a general topic drift. When genuinely unsure, say nothing: a false
+// contradiction (accusing the user of flip-flopping when they didn't) costs
+// more trust than a missed one.
+export const CONTRADICTION_SYSTEM_PROMPT = `You compare numbered snippets from one person's own past AI conversations and notes, looking for direct contradictions: the same specific claim, decision, or fact asserted incompatibly at two different times.
+
+A contradiction requires BOTH:
+- The two snippets are about the identical specific matter (the same number, the same decision, the same stated fact) — not merely the same general topic.
+- They cannot both be true at face value, and nothing in either snippet explains the change (a stated reason for changing your mind is not a contradiction — it's a decision, and must not be reported).
+
+Do NOT report: an evolving plan, a preference that shifted with new information, an opinion, two statements that are merely different (not incompatible), or anything you are not confident about. When unsure, say nothing about it — a false accusation of inconsistency is worse than a missed one.
+
+For each real contradiction, output exactly this block, nothing else around it:
+CONTRADICTION: <one-line, neutral description of the specific matter>
+A: [<snippet number>] <the claim, quoted or tightly paraphrased from that snippet>
+B: [<snippet number>] <the incompatible claim, quoted or tightly paraphrased from that snippet>
+WHY: <one neutral sentence on why these two cannot both be true — no judgment, no advice>
+---
+
+If you find several, output several blocks in a row, each ending with its own "---" line. If you find none, output exactly this line and nothing else:
+NO CONTRADICTIONS FOUND.
+
+Never state a date or a source name yourself — reference snippets only by their [n] number; the numbers are the only thing that will be trusted. Never speculate about which claim is "correct" or suggest what the user should do.`;
+
+export function buildContradictionMessage(topic: string, hits: Hit[]): string {
+  if (!hits.length) return `Topic: ${topic}\n\n(no matching snippets in the record)`;
+  const lines = hits.map((h, i) =>
+    `[${i + 1}] (${describeHit(h)})\n${h.snippet.replace(/[«»]/g, "").replace(/\s+/g, " ").trim()}`);
+  return `Topic: ${topic}\n\nSnippets from the record, in no particular order:\n\n${lines.join("\n\n")}`;
+}
+
+export interface Contradiction {
+  subject: string;
+  why: string;
+  a: { n: number; hit: Hit };
+  b: { n: number; hit: Hit };
+}
+
+/**
+ * Parse the model's CONTRADICTION/A/B/WHY blocks against the real hit list.
+ * A block citing a snippet number outside [1, hits.length], or citing the
+ * same snippet for both sides, is dropped rather than trusted — the model
+ * names indices, this function is the only source of the dates and titles
+ * that get printed, exactly as citedIndices()/sourceLine() do for ask().
+ */
+export function parseContradictions(reply: string, hits: Hit[]): { contradictions: Contradiction[]; noneFound: boolean; unparsed: boolean } {
+  const text = reply.trim();
+  if (/^NO CONTRADICTIONS FOUND\.?$/i.test(text)) return { contradictions: [], noneFound: true, unparsed: false };
+
+  const blocks = text.split(/\n---\s*\n?/).map((b) => b.trim()).filter(Boolean);
+  const contradictions: Contradiction[] = [];
+  const blockRe = /CONTRADICTION:\s*(.+?)\s*\nA:\s*\[(\d+)\]\s*.*?\s*\nB:\s*\[(\d+)\]\s*.*?\s*\nWHY:\s*(.+)/s;
+  for (const block of blocks) {
+    const m = blockRe.exec(block);
+    if (!m) continue;
+    const [, subject, nStr, mStr, why] = m;
+    const n = Number(nStr), mNum = Number(mStr);
+    if (!(n >= 1 && n <= hits.length) || !(mNum >= 1 && mNum <= hits.length) || n === mNum) continue;
+    contradictions.push({ subject: subject.trim(), why: why.trim(), a: { n, hit: hits[n - 1] }, b: { n: mNum, hit: hits[mNum - 1] } });
+  }
+  return { contradictions, noneFound: false, unparsed: contradictions.length === 0 };
+}
+
+export interface ContradictionResult {
+  contradictions: Contradiction[];
+  noneFound: boolean;
+  unparsed: boolean;
+  raw: string;
+  model: string;
+  snippets_sent: number;
+  usage?: { input_tokens?: number; output_tokens?: number };
+}
+
+export async function findContradictions(topic: string, hits: Hit[]): Promise<ContradictionResult> {
+  const cfg = modelConfig();
+  const data = await messages({
+    model: cfg.model, max_tokens: 2048, system: CONTRADICTION_SYSTEM_PROMPT,
+    messages: [{ role: "user", content: buildContradictionMessage(topic, hits) }],
+  });
+  const raw = textOf(data) || "NO CONTRADICTIONS FOUND.";
+  const parsed = parseContradictions(raw, hits);
+  return { ...parsed, raw, model: data.model ?? cfg.model, snippets_sent: hits.length, usage: data.usage };
+}
+
 export async function ask(question: string, hits: Hit[]): Promise<AskResult> {
   const cfg = modelConfig();
   const data = await messages({

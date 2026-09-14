@@ -77,6 +77,12 @@ Then pull the drive mid-conversation. The assistant keeps talking and stops reme
 - **An informed no.** `ask` retrieves through one search path (FTS5, stopwords dropped, optional
   keyword expansion), sends only the question and the top-k snippets, and the prompt forbids outside
   knowledge. The answer cites `[n]`; the CLI prints the thread title and date for every citation.
+- **You said X in March, Y in June.** `contradictions` runs the same retrieval widened across time and
+  asks the model to name only genuine reversals — the same specific claim asserted incompatibly twice,
+  never an evolving plan or a differing opinion. It cites by snippet number; the date and thread it
+  prints come from the retrieval, never from the model's own text, so a citation outside the snippets
+  it was actually given gets dropped rather than trusted. Biased hard toward silence: on two real
+  topics in a 236-conversation record it found nothing rather than force a match.
 
 Zero dependencies: bun, `bun:sqlite`, and a SQLCipher library on the machine that opens the store.
 The only outbound network code is one file, off unless you configure a provider.
@@ -99,6 +105,7 @@ the Messages API instead, set `AI_MEMORY_PROVIDER=api` and put `ANTHROPIC_API_KE
 |---|---|
 | `bun scripts/ingest.ts <export.zip\|dir\|file> [--provider chatgpt\|claude\|gemini] [--dry] [--include-thinking] [--gap-minutes 30]` | Parse a provider export into the store. Auto-detects the provider; skips account-identity files. |
 | `bun scripts/ask.ts "question" [--k 8] [--dry] [--no-expand] [--source conv\|files\|all]` | Answer from your own record with cited sources, or "Not in your record." `--dry` shows what would be sent and sends nothing. |
+| `bun scripts/contradictions.ts "topic" [--k 20] [--dry] [--no-expand] [--source conv\|files\|all]` | Find where your record asserts the same specific thing two incompatible ways, dated and cited. Reports nothing when unsure. |
 | `bun scripts/query.ts "phrase" [--limit 5] [--source all\|conv\|files]` | Raw full-text search over conversations and collected files. |
 | `bun scripts/collect.ts <dir...> [--max-mb 5] [--dry]` | Sweep local folders (notes, code) into the same store. |
 | `bun scripts/encrypt.ts migrate\|rekey\|check [--dry]` | Migrate a plaintext index to SQLCipher, change the passphrase, or report the state. |
@@ -135,5 +142,5 @@ ISA.md                the system of record for how this was built and verified
 ## tests
 
 ```sh
-bun test        # 70 tests: parsers, crypto migration, push/pull, ask (model endpoint mocked), audit regressions
+bun test        # 81 tests: parsers, crypto migration, push/pull, ask + contradictions (model endpoint mocked), audit regressions
 ```
