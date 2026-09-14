@@ -23,9 +23,9 @@ context and rent the model. This is memory infrastructure, nothing more.
 4. **Skips account-identity files** in every archive (`users.json`, `user.json`): your name, email,
    and phone are not conversation memory and are never written to the store.
 5. **Indexes for search** (FTS5) so `query` answers from your own record, and prints "no matches"
-   rather than inventing a result. With a model key configured, `ask` sends the question and those
-   matching snippets to the model; the answer must cite which snippet it came from and say "not in
-   your record" when nothing matched.
+   rather than inventing a result. (Planned `ask` layer: with a model key configured, the question and those
+   matching snippets go to the model; the answer must cite which snippet it came from and say "not
+   in your record" when nothing matched.)
 6. **Copies to the media you name** with `push`, then reopens the copied index on that media with
    your key and counts rows before it says "verified". A copy that does not reopen is a failure.
 7. **Deletes on request.** `forget <conversation-id>` or `forget --provider X` removes conversations
@@ -34,12 +34,11 @@ context and rent the model. This is memory infrastructure, nothing more.
 ## What it never does
 
 - Never fetches, scrapes, or automates anything against a provider account.
-- Never sends data anywhere, with one opt-in exception: `ask` (the display terminal and
-  `/api/ask`) sends your question plus the matching snippets to the model provider you configure
-  with `ANTHROPIC_API_KEY`. No key → no call, search only. Never the passphrase, never the whole
-  store; the response shows how many snippets went out and to which model. That is the only
-  network code in this repository (tests enforce it lives in one file). As of 2026-09-14 the module
-  exists but is not wired into the server; enabling it is a deliberate step, not a default.
+- Never sends data anywhere. There is no outbound network code in the tracked tree. One opt-in
+  exception is planned and drafted (`ask`: your question plus the matching snippets to the model
+  provider you configure with `ANTHROPIC_API_KEY`; no key → no call; never the passphrase, never the
+  whole store). Until it lands, this bullet is the whole rule; when it lands, a test will enforce that
+  it is the only network code in the repository.
 - Never writes plaintext into `corpus/`. That folder is an inbox you control; the store is the
   encrypted database. `push` never copies `corpus/` to removable media.
 - Never places a plaintext database on removable media. `push` checks the file header and refuses.
