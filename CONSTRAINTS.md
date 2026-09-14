@@ -35,9 +35,10 @@ context and rent the model. This is memory infrastructure, nothing more.
 
 - Never fetches, scrapes, or automates anything against a provider account.
 - Never sends data anywhere, with one opt-in exception: `ask` sends your question plus the top-k
-  matching snippets to the model provider you configure with `ANTHROPIC_API_KEY` (read from `.env`,
-  never logged, never in output). No key → no call; `--dry` shows exactly what would be sent and sends
-  nothing. Never the passphrase, never the whole store. A test enforces that `scripts/lib/ask.ts` is the
+  matching snippets to the model provider you configure — by default the `claude` CLI signed in to your
+  own subscription, or the Messages API with `ANTHROPIC_API_KEY` (read from `.env`, never logged, never
+  in output) when `AI_MEMORY_PROVIDER=api`. No provider → no call; `--dry` shows exactly what would be
+  sent and sends nothing. Never the passphrase, never the whole store. A test enforces that `scripts/lib/ask.ts` is the
   only outbound network code in the repository.
 - Never writes plaintext into `corpus/`. That folder is an inbox you control; the store is the
   encrypted database. `push` never copies `corpus/` to removable media.
