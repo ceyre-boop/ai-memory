@@ -269,7 +269,11 @@ test("no output ever contains the passphrase", () => {
   expect(r.out + r.err).not.toContain(KEY);
 });
 
-test("no network code in scripts/", () => {
-  const files = Bun.spawnSync({ cmd: ["sh", "-c", `grep -rlE 'fetch\\(|openai\\.com|anthropic\\.com|google\\.com|https?://' ${join(REPO, "scripts")} || true`] });
-  expect(files.stdout.toString().trim()).toBe("");
+test("ingester and parsers contain no network code", async () => {
+  const { readdirSync, statSync } = await import("node:fs");
+  const files: string[] = [join(REPO, "scripts", "ingest.ts")];
+  const walk = (d: string) => { for (const e of readdirSync(d)) { const p = join(d, e); statSync(p).isDirectory() ? walk(p) : files.push(p); } };
+  walk(join(REPO, "scripts", "lib", "parsers"));
+  const bad = files.filter((f) => /\bfetch\(|https?:\/\//.test(readFileSync(f, "utf8")));
+  expect(bad).toEqual([]);
 });

@@ -8,3 +8,5 @@ corpus/
 # runtime
 node_modules/
 .DS_Store
+# parked work (not tracked)
+wip/
