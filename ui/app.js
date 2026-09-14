@@ -285,10 +285,10 @@ document.addEventListener('DOMContentLoaded', () => {
   function streamInto(el, text, done) {
     let i = 0; const t0 = performance.now();
     const iv = setInterval(() => {
-      el.textContent += text.charAt(i++);
+      el.textContent += text.slice(i, i + 4); i += 4;
       terminalOutput.scrollTop = terminalOutput.scrollHeight;
       if (i >= text.length) { clearInterval(iv); done && done(performance.now() - t0); }
-    }, 6);
+    }, 8);
   }
 
   async function openConversation(id) {

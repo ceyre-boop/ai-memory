@@ -4,11 +4,11 @@ slug: 20260913-234958_ai-memory-foundation
 project: ai-memory
 effort: deep
 effort_source: classifier
-phase: build
-progress: 0/146
+phase: execute
+progress: 101/156
 mode: interactive
 started: 2026-09-13T23:49:58Z
-updated: 2026-09-13T23:55:00Z
+updated: 2026-09-14T00:25:00Z
 ---
 
 ## Problem
@@ -58,37 +58,37 @@ CONSTRAINTS.md is committed first; `bun scripts/ingest.ts <archive>` ingests Cha
 ## Criteria
 
 ### Repository and spine
-- [ ] ISC-1: `~/ai-memory` is a git repository on branch `main` with ≥1 commit.
-- [ ] ISC-2: `CONSTRAINTS.md` exists at repo root and is tracked by git.
-- [ ] ISC-3: `CONSTRAINTS.md` is ≤120 lines (`wc -l`).
-- [ ] ISC-4: `CONSTRAINTS.md` has a heading containing "does with your data".
-- [ ] ISC-5: `CONSTRAINTS.md` has a heading containing "never does".
-- [ ] ISC-6: `CONSTRAINTS.md` has a heading containing "drive is lost" and states the passphrase-only, no-escrow decision.
-- [ ] ISC-7: `CONSTRAINTS.md` has a heading containing "Third parties".
-- [ ] ISC-8: `CONSTRAINTS.md` states that the user supplies the export file and the system never fetches it.
-- [ ] ISC-9: `CONSTRAINTS.md` states that plaintext never lands on removable media.
-- [ ] ISC-10: `CONSTRAINTS.md` states the `--dry` rule.
-- [ ] ISC-11: `README.md` documents init, ingest, query, collect, encrypt, forget, status, and push commands.
-- [ ] ISC-12: `.gitignore` excludes `embeddings/`, `corpus/`, `.env`, and `*.key`.
-- [ ] ISC-13: The first commit on `main` contains `CONSTRAINTS.md` and no `scripts/` changes (build order proven by `git log`).
-- [ ] ISC-14: The repository has a private GitHub remote and `main` is pushed (`git status -sb` shows no `ahead`).
+- [x] ISC-1: `~/ai-memory` is a git repository on branch `main` with ≥1 commit.
+- [x] ISC-2: `CONSTRAINTS.md` exists at repo root and is tracked by git.
+- [x] ISC-3: `CONSTRAINTS.md` is ≤120 lines (`wc -l`).
+- [x] ISC-4: `CONSTRAINTS.md` has a heading containing "does with your data".
+- [x] ISC-5: `CONSTRAINTS.md` has a heading containing "never does".
+- [x] ISC-6: `CONSTRAINTS.md` has a heading containing "drive is lost" and states the passphrase-only, no-escrow decision.
+- [x] ISC-7: `CONSTRAINTS.md` has a heading containing "Third parties".
+- [x] ISC-8: `CONSTRAINTS.md` states that the user supplies the export file and the system never fetches it.
+- [x] ISC-9: `CONSTRAINTS.md` states that plaintext never lands on removable media.
+- [x] ISC-10: `CONSTRAINTS.md` states the `--dry` rule.
+- [x] ISC-11: `README.md` documents init, ingest, query, collect, encrypt, forget, status, and push commands.
+- [x] ISC-12: `.gitignore` excludes `embeddings/`, `corpus/`, `.env`, and `*.key`.
+- [x] ISC-13: The first commit on `main` contains `CONSTRAINTS.md` and no `scripts/` changes (build order proven by `git log`).
+- [x] ISC-14: The repository has a private GitHub remote and `main` is pushed (`git status -sb` shows no `ahead`).
 
 ### Shared library
-- [ ] ISC-15: `scripts/lib/db.ts` exports `openStore()`.
-- [ ] ISC-16: `openStore()` calls `Database.setCustomSQLite` with a libsqlcipher path before any database opens.
+- [x] ISC-15: `scripts/lib/db.ts` exports `openStore()`.
+- [x] ISC-16: `openStore()` calls `Database.setCustomSQLite` with a libsqlcipher path before any database opens.
 - [ ] ISC-17: `AI_MEMORY_SQLCIPHER` overrides the cipher library path.
 - [ ] ISC-18: A missing cipher library produces an error message that names the install command and exits non-zero.
-- [ ] ISC-19: The passphrase is read from `AI_MEMORY_KEY` when set.
+- [x] ISC-19: The passphrase is read from `AI_MEMORY_KEY` when set.
 - [ ] ISC-20: The passphrase is read from the file named by `--key-file` (trailing newline stripped).
-- [ ] ISC-21: With no key source and no TTY, scripts exit code 2 with a message naming the three key sources.
-- [ ] ISC-22: A wrong passphrase produces the message "wrong passphrase or not an ai-memory store" and exit non-zero.
-- [ ] ISC-23: Anti: no script prints the passphrase (test asserts stdout+stderr of every command exclude it).
-- [ ] ISC-24: `conversations` table exists with columns id, provider, source_id, title, created_at, updated_at, message_count, thread_inferred, export_file, export_hash, imported_at.
-- [ ] ISC-25: `messages` table exists with columns id, conversation_id, seq, role, created_at, body, parent_id, on_main_path, content_types.
-- [ ] ISC-26: `messages_fts` is an FTS5 external-content table kept in sync by insert/delete/update triggers.
+- [x] ISC-21: With no key source and no TTY, scripts exit code 2 with a message naming the three key sources.
+- [x] ISC-22: A wrong passphrase produces the message "wrong passphrase or not an ai-memory store" and exit non-zero.
+- [x] ISC-23: Anti: no script prints the passphrase (test asserts stdout+stderr of every command exclude it).
+- [x] ISC-24: `conversations` table exists with columns id, provider, source_id, title, created_at, updated_at, message_count, thread_inferred, export_file, export_hash, imported_at.
+- [x] ISC-25: `messages` table exists with columns id, conversation_id, seq, role, created_at, body, parent_id, on_main_path, content_types.
+- [x] ISC-26: `messages_fts` is an FTS5 external-content table kept in sync by insert/delete/update triggers.
 - [ ] ISC-27: `files` and `chunks` tables are unchanged in shape after migration (same column list).
-- [ ] ISC-28: Calling `openStore()` twice on the same file raises no error (schema creation idempotent).
-- [ ] ISC-29: `AI_MEMORY_HOME` overrides the store root directory.
+- [x] ISC-28: Calling `openStore()` twice on the same file raises no error (schema creation idempotent).
+- [x] ISC-29: `AI_MEMORY_HOME` overrides the store root directory.
 - [ ] ISC-30: Anti: no `new Database(` call exists outside `scripts/lib/db.ts`, `scripts/encrypt.ts`, and `tests/`.
 
 ### Encryption at rest
@@ -108,78 +108,78 @@ CONSTRAINTS.md is committed first; `bun scripts/ingest.ts <archive>` ingests Cha
 - [ ] ISC-44: Anti: no script writes under `corpus/` (grep for writes targeting the corpus path returns none).
 
 ### Ingester — general
-- [ ] ISC-45: `scripts/ingest.ts` accepts a `.zip` path.
-- [ ] ISC-46: `ingest.ts` accepts an extracted directory path.
-- [ ] ISC-47: `ingest.ts` accepts a bare `conversations.json` or `MyActivity.json` file path.
-- [ ] ISC-48: Provider is auto-detected from content (`mapping` → chatgpt, `chat_messages` → claude, `Gemini Apps` → gemini).
-- [ ] ISC-49: `--provider chatgpt|claude|gemini` overrides detection.
-- [ ] ISC-50: `--dry` prints conversation and message counts per role and leaves the database row counts unchanged.
-- [ ] ISC-51: Zip entries are streamed with `unzip -p`; grep of `ingest.ts` shows no `mkdtemp`, `tmpdir`, or extraction to disk.
+- [x] ISC-45: `scripts/ingest.ts` accepts a `.zip` path.
+- [x] ISC-46: `ingest.ts` accepts an extracted directory path.
+- [x] ISC-47: `ingest.ts` accepts a bare `conversations.json` or `MyActivity.json` file path.
+- [x] ISC-48: Provider is auto-detected from content (`mapping` → chatgpt, `chat_messages` → claude, `Gemini Apps` → gemini).
+- [x] ISC-49: `--provider chatgpt|claude|gemini` overrides detection.
+- [x] ISC-50: `--dry` prints conversation and message counts per role and leaves the database row counts unchanged.
+- [x] ISC-51: Zip entries are streamed with `unzip -p`; grep of `ingest.ts` shows no `mkdtemp`, `tmpdir`, or extraction to disk.
 - [ ] ISC-52: When `unzip` is absent the error names the fallback (extract manually, pass the directory).
-- [ ] ISC-53: Ingesting the same fixture twice leaves conversation and message counts unchanged.
-- [ ] ISC-54: Ingesting a modified export with the same conversation source_id replaces that conversation's messages (upsert).
-- [ ] ISC-55: Anti: `users.json` / `user.json` are never read; the fixture's account email does not appear anywhere in the database.
-- [ ] ISC-56: The ingest summary lists skipped files by name with a reason.
-- [ ] ISC-57: Anti: no `fetch(` and no provider hostname appears in `scripts/`.
-- [ ] ISC-58: `created_at` values are integer unix milliseconds (`typeof === 'number'`, > 1e12).
-- [ ] ISC-59: Messages with an empty body are skipped and counted as `empty_skipped`.
-- [ ] ISC-60: A phrase from each fixture is returned by `query.ts` immediately after ingest.
-- [ ] ISC-61: `content_types` is a JSON array string per message (e.g. `["thinking","text"]`).
-- [ ] ISC-62: An unrecognised archive exits 1 with a message listing the three supported providers.
-- [ ] ISC-63: `export_file` records the archive basename and `export_hash` a content hash of the parsed file.
+- [x] ISC-53: Ingesting the same fixture twice leaves conversation and message counts unchanged.
+- [x] ISC-54: Ingesting a modified export with the same conversation source_id replaces that conversation's messages (upsert).
+- [x] ISC-55: Anti: `users.json` / `user.json` are never read; the fixture's account email does not appear anywhere in the database.
+- [x] ISC-56: The ingest summary lists skipped files by name with a reason.
+- [x] ISC-57: Anti: no `fetch(` and no provider hostname appears in `scripts/`.
+- [x] ISC-58: `created_at` values are integer unix milliseconds (`typeof === 'number'`, > 1e12).
+- [x] ISC-59: Messages with an empty body are skipped and counted as `empty_skipped`.
+- [x] ISC-60: A phrase from each fixture is returned by `query.ts` immediately after ingest.
+- [x] ISC-61: `content_types` is a JSON array string per message (e.g. `["thinking","text"]`).
+- [x] ISC-62: An unrecognised archive exits 1 with a message listing the three supported providers.
+- [x] ISC-63: `export_file` records the archive basename and `export_hash` a content hash of the parsed file.
 
 ### ChatGPT parser
-- [ ] ISC-64: Parses a `conversations.json` array whose items carry `mapping`.
-- [ ] ISC-65: `source_id` = `conversation_id` when present, else `id`.
-- [ ] ISC-66: `title` is preserved verbatim.
-- [ ] ISC-67: `created_at` = `create_time` seconds → ms.
-- [ ] ISC-68: `updated_at` = `update_time` seconds → ms.
-- [ ] ISC-69: Nodes on the path from `current_node` to the root have `on_main_path = 1`.
-- [ ] ISC-70: Off-path nodes (edits/regenerations) are retained with `on_main_path = 0`.
-- [ ] ISC-71: `seq` is depth-first with parent before child; sibling order follows `children`.
-- [ ] ISC-72: Roles `user`, `assistant`, `system`, `tool` are stored verbatim.
-- [ ] ISC-73: `content_type: text` parts are joined with newlines.
-- [ ] ISC-74: `content_type: code` bodies are fenced with the language.
-- [ ] ISC-75: `multimodal_text` image parts become `[image: <asset_pointer>]`.
-- [ ] ISC-76: The root system node with empty parts is skipped.
-- [ ] ISC-77: A null `create_time` yields `created_at = NULL`, never 0 or NaN.
-- [ ] ISC-78: `parent_id` mirrors `mapping[id].parent`.
-- [ ] ISC-79: Fixture `tests/fixtures/chatgpt/conversations.json` has 2 conversations, one with an edited branch.
-- [ ] ISC-80: `tests/ingest.test.ts` asserts the ChatGPT fixture counts and the branch flag.
+- [x] ISC-64: Parses a `conversations.json` array whose items carry `mapping`.
+- [x] ISC-65: `source_id` = `conversation_id` when present, else `id`.
+- [x] ISC-66: `title` is preserved verbatim.
+- [x] ISC-67: `created_at` = `create_time` seconds → ms.
+- [x] ISC-68: `updated_at` = `update_time` seconds → ms.
+- [x] ISC-69: Nodes on the path from `current_node` to the root have `on_main_path = 1`.
+- [x] ISC-70: Off-path nodes (edits/regenerations) are retained with `on_main_path = 0`.
+- [x] ISC-71: `seq` is depth-first with parent before child; sibling order follows `children`.
+- [x] ISC-72: Roles `user`, `assistant`, `system`, `tool` are stored verbatim.
+- [x] ISC-73: `content_type: text` parts are joined with newlines.
+- [x] ISC-74: `content_type: code` bodies are fenced with the language.
+- [x] ISC-75: `multimodal_text` image parts become `[image: <asset_pointer>]`.
+- [x] ISC-76: The root system node with empty parts is skipped.
+- [x] ISC-77: A null `create_time` yields `created_at = NULL`, never 0 or NaN.
+- [x] ISC-78: `parent_id` mirrors `mapping[id].parent`.
+- [x] ISC-79: Fixture `tests/fixtures/chatgpt/conversations.json` has 2 conversations, one with an edited branch.
+- [x] ISC-80: `tests/ingest.test.ts` asserts the ChatGPT fixture counts and the branch flag.
 
 ### Claude parser
-- [ ] ISC-81: Parses a `conversations.json` array whose items carry `chat_messages`.
-- [ ] ISC-82: `source_id` = `uuid`, `title` = `name`.
-- [ ] ISC-83: ISO `created_at`/`updated_at` become ms integers.
-- [ ] ISC-84: `sender: human` → `user`; `assistant` stays `assistant`.
-- [ ] ISC-85: `text` content parts are concatenated in order.
-- [ ] ISC-86: `thinking` parts are excluded from body by default and recorded in `content_types`.
-- [ ] ISC-87: `--include-thinking` includes thinking text in the body.
-- [ ] ISC-88: `tool_use` parts become `[tool_use: <name>]` and `tool_result` parts `[tool_result]` lines.
-- [ ] ISC-89: When `content` is absent the `text` field is used.
-- [ ] ISC-90: `attachments[].extracted_content` is appended as `[attachment: <file_name>]` followed by the content.
-- [ ] ISC-91: `files[]` are listed as `[file: <file_name>]`.
-- [ ] ISC-92: `parent_message_uuid` → `parent_id`.
-- [ ] ISC-93: `seq` follows array order.
-- [ ] ISC-94: Fixture `tests/fixtures/claude/conversations.json` is synthetic and includes thinking, tool_use, and an attachment.
-- [ ] ISC-95: Test asserts Claude fixture counts and that thinking text is absent from bodies by default.
-- [ ] ISC-96: `users.json`, `memories.json`, and `projects/` alongside the file are skipped and reported.
+- [x] ISC-81: Parses a `conversations.json` array whose items carry `chat_messages`.
+- [x] ISC-82: `source_id` = `uuid`, `title` = `name`.
+- [x] ISC-83: ISO `created_at`/`updated_at` become ms integers.
+- [x] ISC-84: `sender: human` → `user`; `assistant` stays `assistant`.
+- [x] ISC-85: `text` content parts are concatenated in order.
+- [x] ISC-86: `thinking` parts are excluded from body by default and recorded in `content_types`.
+- [x] ISC-87: `--include-thinking` includes thinking text in the body.
+- [x] ISC-88: `tool_use` parts become `[tool_use: <name>]` and `tool_result` parts `[tool_result]` lines.
+- [x] ISC-89: When `content` is absent the `text` field is used.
+- [x] ISC-90: `attachments[].extracted_content` is appended as `[attachment: <file_name>]` followed by the content.
+- [x] ISC-91: `files[]` are listed as `[file: <file_name>]`.
+- [x] ISC-92: `parent_message_uuid` → `parent_id`.
+- [x] ISC-93: `seq` follows array order.
+- [x] ISC-94: Fixture `tests/fixtures/claude/conversations.json` is synthetic and includes thinking, tool_use, and an attachment.
+- [x] ISC-95: Test asserts Claude fixture counts and that thinking text is absent from bodies by default.
+- [x] ISC-96: `users.json`, `memories.json`, and `projects/` alongside the file are skipped and reported.
 
 ### Gemini parser
-- [ ] ISC-97: Locates `My Activity/Gemini Apps/MyActivity.json` at any depth in a directory or zip.
+- [x] ISC-97: Locates `My Activity/Gemini Apps/MyActivity.json` at any depth in a directory or zip.
 - [ ] ISC-98: Only entries whose `products` include "Gemini Apps" are used.
-- [ ] ISC-99: `title: "Prompted X"` becomes a `user` message with body X.
-- [ ] ISC-100: `safeHtmlItem[].html` becomes an `assistant` message with tags stripped and entities decoded.
-- [ ] ISC-101: Block-level HTML (`p`, `br`, `li`, `div`, headings) becomes newlines.
-- [ ] ISC-102: `time` ISO → ms for both messages of a pair.
-- [ ] ISC-103: Entries are sorted ascending by time before threading.
-- [ ] ISC-104: Consecutive entries ≤30 minutes apart share a thread; `--gap-minutes` changes the window.
-- [ ] ISC-105: Inferred threads have `thread_inferred = 1` and title = first prompt truncated to 80 chars.
-- [ ] ISC-106: Thread ids are deterministic (hash of first entry time + text) so re-ingest is idempotent.
-- [ ] ISC-107: An entry without `safeHtmlItem` yields the user message only.
-- [ ] ISC-108: Fixture `tests/fixtures/gemini/Takeout/My Activity/Gemini Apps/MyActivity.json` has 4 entries forming 2 threads.
-- [ ] ISC-109: Test asserts 2 conversations, `thread_inferred = 1`, and stripped HTML.
-- [ ] ISC-110: An HTML-only Takeout (`MyActivity.html`, no JSON) exits 1 with "re-export as JSON".
+- [x] ISC-99: `title: "Prompted X"` becomes a `user` message with body X.
+- [x] ISC-100: `safeHtmlItem[].html` becomes an `assistant` message with tags stripped and entities decoded.
+- [x] ISC-101: Block-level HTML (`p`, `br`, `li`, `div`, headings) becomes newlines.
+- [x] ISC-102: `time` ISO → ms for both messages of a pair.
+- [x] ISC-103: Entries are sorted ascending by time before threading.
+- [x] ISC-104: Consecutive entries ≤30 minutes apart share a thread; `--gap-minutes` changes the window.
+- [x] ISC-105: Inferred threads have `thread_inferred = 1` and title = first prompt truncated to 80 chars.
+- [x] ISC-106: Thread ids are deterministic (hash of first entry time + text) so re-ingest is idempotent.
+- [x] ISC-107: An entry without `safeHtmlItem` yields the user message only.
+- [x] ISC-108: Fixture `tests/fixtures/gemini/Takeout/My Activity/Gemini Apps/MyActivity.json` has 4 entries forming 2 threads.
+- [x] ISC-109: Test asserts 2 conversations, `thread_inferred = 1`, and stripped HTML.
+- [x] ISC-110: An HTML-only Takeout (`MyActivity.html`, no JSON) exits 1 with "re-export as JSON".
 
 ### query.ts
 - [ ] ISC-111: `query.ts` opens the store through `openStore()`.
@@ -221,11 +221,23 @@ CONSTRAINTS.md is committed first; `bun scripts/ingest.ts <archive>` ingests Cha
 - [ ] ISC-139: `bun test` passes with 0 failures.
 - [ ] ISC-140: Anti: `tests/` never reference `embeddings/index.db`; every test sets `AI_MEMORY_HOME` to a temp dir.
 - [ ] ISC-141: Every script prints usage and exits non-zero when called with no arguments (or `--help`).
-- [ ] ISC-142: `package.json` has no `dependencies` or `devDependencies` keys.
+- [x] ISC-142: `package.json` has no `dependencies` or `devDependencies` keys.
 - [ ] ISC-143: Anti: grep finds no `/Users/taboost` in tracked files.
-- [ ] ISC-144: `ingest.ts --dry` on the real Claude export reports 116 conversations.
+- [x] ISC-144: `ingest.ts --dry` on the real Claude export reports 116 conversations.
 - [ ] ISC-145: The real Claude export is ingested into the encrypted store and `query.ts` returns a hit from it.
 - [ ] ISC-146: `manifest.json` stats include conversations and messages counts; Obsidian `NEXT.md` carries the ai-memory state line.
+
+### Display backend (added 2026-09-14 — user asked for a backend for the localhost front end)
+- [x] ISC-147: `scripts/serve.ts` binds 127.0.0.1 only and serves `ui/` (index.html, app.js, styles.css) with no other static paths.
+- [x] ISC-148: `GET /api/telemetry` returns status, encrypted flag, and real row counts; never the passphrase.
+- [x] ISC-149: `GET /api/nodes` returns conversations newest-first with provider cluster, dates, message_count, thread_inferred, first user message.
+- [x] ISC-150: `GET /api/nodes?q=` filters to conversations with FTS hits, ranked by best bm25.
+- [x] ISC-151: `GET /api/conversation/:id` returns ordered messages with role, timestamps, and branch flags; unknown id → 404.
+- [x] ISC-152: `GET /api/search?q=` merges message and file hits with snippets; FTS operators in the query never throw; no hits → empty list.
+- [x] ISC-153: Anti: non-GET requests return 405; `/api/*` unknown → 404; no CORS wildcard header.
+- [x] ISC-154: `ui/app.js` contains no simulated data: nodes, inspector, telemetry, and terminal read only from the API; empty results say "no matches".
+- [x] ISC-155: `tests/serve.test.ts` covers ISC-147..153 against a temp store built from the fixtures.
+- [x] ISC-156: The page renders in real Chrome with zero console errors, live counts, and a search that highlights hit nodes and switches the inspector.
 
 ## Test Strategy
 
@@ -239,6 +251,7 @@ CONSTRAINTS.md is committed first; `bun scripts/ingest.ts <archive>` ingests Cha
 | 111–118 | live | query CLI output on temp store and on real index with timing | ≤1000 ms | Bash |
 | 119–127 | unit | collect/forget CLI on temp store | exact | bun test |
 | 128–138 | unit | push to temp target dir; plaintext refusal; manifest grep | exit codes | bun test |
+| 147–156 | unit + live | serve.test.ts; Claude-in-Chrome screenshot + console read | 0 errors | bun test, Chrome |
 | 139–146 | live | bun test summary; greps; real export dry + ingest; NEXT.md grep | 0 failures | Bash |
 
 ## Features
@@ -255,6 +268,7 @@ CONSTRAINTS.md is committed first; `bun scripts/ingest.ts <archive>` ingests Cha
 | query-collect | port query.ts and collect.ts to openStore, unified search | 111–122 | store-lib | yes (Forge) |
 | forget | forget.ts with --dry | 123–127 | store-lib | yes (Forge) |
 | push | push.ts plaintext refusal, keyed verify, --dry, manifest pushes | 128–138 | store-lib | yes (Forge) |
+| display-backend | serve.ts + ui/ over the store | 147–156 | store-lib | yes (main) |
 | real-data | migrate the 2 GB index, ingest real Claude export, NEXT.md | 139–146 | all | no |
 
 ## Decisions
@@ -269,10 +283,18 @@ CONSTRAINTS.md is committed first; `bun scripts/ingest.ts <archive>` ingests Cha
 - 2026-09-13T23:49Z — Work happens in `~/ai-memory` (where code and index live); the cwd `~/-ai-memory` is an empty stray repo, left untouched.
 - 2026-09-13T23:49Z — Delegation: Forge takes encryption/query-collect/forget/push slice after store-lib lands; main thread writes the ingester (the product). Cato audits at VERIFY.
 
+- 2026-09-14T00:10Z — Front end found at ~/-ai-memory (node static server, port 3000, fully simulated data). Consolidated into ~/ai-memory/ui/ and backed by serve.ts; simulated nodes/responses replaced with store reads so the page obeys CONSTRAINTS.md (admits empty results, marks inferred threads). Old server left running untouched.
+- 2026-09-14T00:15Z — Interceptor extension not connected in Chrome; visual verification done through the Claude-in-Chrome extension (real browser, not CDP).
+
 ## Changelog
 
 - 2026-09-13T23:49Z — conjectured: `corpus/` must itself be encrypted to satisfy the hard rule. refuted_by: FirstPrinciples challenge — the rule forbids the *system* writing plaintext there; documents can live inside the encrypted DB. learned: name the corpus correctly and the second encryption layer disappears. criterion_now: ISC-44 (no script writes under corpus/) and ISC-129 (push excludes corpus/).
 
 ## Verification
 
-_(populated at VERIFY)_
+- ISC-147..156: `bun test tests/serve.test.ts` → `7 pass, 0 fail, 29 expect() calls`; Chrome screenshot of http://127.0.0.1:3131 shows "ONLINE · ENCRYPTED", "6 SHOWN", inspector "Debug a bun test / Claude / 2 messages"; console errors: none; search "sourdough Denver" → "[STORE] 3 matches in 57 ms", inspector switched to the Gemini thread with "Thread boundary inferred from timing".
+
+- ISC-1..14: Bash — `git log --oneline`: `a792e72 CONSTRAINTS.md…` (CONSTRAINTS.md, README.md, .gitignore, ISA.md only) precedes `51ee00e store lib` and `7e7ba4d export ingester`; `gh repo create ceyre-boop/ai-memory --private … --push` → `* [new branch] HEAD -> main`; `git status -sb` → `## main...origin/main`; `wc -l CONSTRAINTS.md` → 80; headings present by Read.
+- ISC-15..29: bun -e smoke against a temp AI_MEMORY_HOME — create → `plaintext? false`, reopen counts `{conversations:1, messages:1}`, readonly open ok, wrong key → `wrong passphrase or not an ai-memory store`; no key + no TTY → exit 2 with the three sources named; WAL grep for the inserted word → 0 hits; meta sidecar `kdf_iter: 256000` written.
+- ISC-45..110: `bun test tests/ingest.test.ts` → `20 pass, 0 fail, 102 expect() calls` (fixture counts, main-path flags, ms timestamps, thinking exclusion, tool/attachment markers, Gemini gap threading with deterministic ids, zip via unzip -p, upsert, identity never stored, no network code).
+- ISC-144: `bun scripts/ingest.ts <real Claude export dir> --dry` → `116 conversations · 2,418 messages · user 1,244 · assistant 1,174 · 136 empty messages skipped · skipped users.json (account identity — never stored)`; same counts from the real .zip via unzip -p.
