@@ -84,4 +84,8 @@ Your conversations mention other people: colleagues, friends, family, public fig
 - Nothing writes to `corpus/` unencrypted. The encrypted database is the corpus.
 - `--dry` on every destructive or bulk operation.
 - `push` verification is mandatory: reopen the index on the target after the copy.
+- Copying to removable media is a human act. `push` refuses to write to a target when it is run from
+  inside an AI coding session (the `CLAUDECODE` environment variable is set); from there only `--dry` works.
+  What goes on the chip, and therefore what the assistant can ever recall, is decided by a person at a
+  terminal.
 - Changing any rule on this page requires editing this page first, in its own commit.
