@@ -12,10 +12,10 @@
     "documents": 2,
     "chunks": 905207,
     "last_indexed": "2026-09-13T20:15:19.737Z",
-    "conversations": 116,
-    "messages": 2418,
+    "conversations": 236,
+    "messages": 2919,
     "files": 54614,
-    "last_ingest": "2026-09-14T00:36:15.497Z"
+    "last_ingest": "2026-09-14T21:18:16.725Z"
   },
   "pushes": [
     {
@@ -66,6 +66,16 @@
         "chunks": 905207,
         "conversations": 116,
         "messages": 2418
+      }
+    },
+    {
+      "target": "/Volumes/AIMEMORY/ai-memory",
+      "at": "2026-09-14T21:22:33.285Z",
+      "counts": {
+        "files": 54633,
+        "chunks": 907698,
+        "conversations": 236,
+        "messages": 2919
       }
     }
   ]
