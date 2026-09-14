@@ -27,6 +27,7 @@ written anywhere by these scripts. There is no recovery if you lose it.
 | `bun scripts/forget.ts <conversation-id> \| --provider X [--dry]` | Delete conversations and their search entries. |
 | `bun scripts/status.ts` | Encryption state, row counts, recorded pushes. |
 | `bun scripts/push.ts /Volumes/CHIP [--dry] [--pull]` | Copy the store to media, then reopen and count it there. Refuses plaintext. |
+| `bun scripts/serve.ts [--port 3131]` | Local display: `ui/` plus a read-only JSON API over the store on 127.0.0.1. |
 
 `--dry` prints the plan and writes nothing. Every bulk or destructive command has it.
 
@@ -41,7 +42,8 @@ written anywhere by these scripts. There is no recovery if you lose it.
 
 ```
 CONSTRAINTS.md        the contract
-scripts/              ingest, query, collect, encrypt, forget, status, push
+scripts/              ingest, query, collect, encrypt, forget, status, push, serve
+ui/                   the display served by serve.ts (canvas of conversations, search terminal)
 scripts/lib/          openStore(), key handling, schema, parsers
 tests/                bun test; fixtures/ holds one synthetic export per provider
 embeddings/index.db   the store (SQLCipher) — the corpus lives here

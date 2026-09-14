@@ -6,6 +6,11 @@
     "collect": "bun scripts/collect.ts",
     "query": "bun scripts/query.ts",
     "push": "bun scripts/push.ts",
-    "ingest": "bun scripts/ingest.ts"
+    "ingest": "bun scripts/ingest.ts",
+    "serve": "bun scripts/serve.ts",
+    "encrypt": "bun scripts/encrypt.ts",
+    "forget": "bun scripts/forget.ts",
+    "status": "bun scripts/status.ts",
+    "test": "bun test"
   }
 }

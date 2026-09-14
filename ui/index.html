@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ai-memory display</title>
+  <meta name="description" content="Local display over your encrypted ai-memory store: every node is a conversation you exported; search reads your own record.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header Telemetry Bar -->
+    <header class="header-bar">
+      <div class="brand">
+        <div class="pulse-orb"></div>
+        <div class="brand-text">
+          <h1>AI-MEMORY DISPLAY</h1>
+          <span class="sub-brand">ENCRYPTED STORE &bull; LOOPBACK ONLY</span>
+        </div>
+      </div>
+
+      <div class="telemetry-grid">
+        <div class="stat-card">
+          <span class="stat-label">HOST</span>
+          <span class="stat-value highlight-cyan" id="stat-host">localhost:3000</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">STATUS</span>
+          <span class="stat-value highlight-green" id="stat-status">
+            <span class="dot-green"></span> ONLINE
+          </span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">CONVERSATIONS</span>
+          <span class="stat-value" id="stat-nodes">36 ACTIVE</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">LATENCY</span>
+          <span class="stat-value" id="stat-latency">14 ms</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">FILE CHUNKS</span>
+          <span class="stat-value highlight-purple" id="stat-tps">48.2 t/s</span>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <button id="btn-voice-toggle" class="icon-btn" title="Toggle Audio Voice Readout">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+          </svg>
+        </button>
+        <button id="btn-refresh-mesh" class="icon-btn" title="Re-index Neural Graph">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Workspace Grid -->
+    <main class="workspace-grid">
+      
+      <!-- Left Viewport: Neural Cognitive Canvas -->
+      <section class="panel canvas-panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <svg class="panel-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="3"></circle>
+              <circle cx="19" cy="5" r="2"></circle>
+              <circle cx="5" cy="5" r="2"></circle>
+              <circle cx="5" cy="19" r="2"></circle>
+              <circle cx="19" cy="19" r="2"></circle>
+              <line x1="10" y1="10" x2="6.5" y2="6.5"></line>
+              <line x1="14" y1="10" x2="17.5" y2="6.5"></line>
+              <line x1="10" y1="14" x2="6.5" y2="17.5"></line>
+              <line x1="14" y1="14" x2="17.5" y2="17.5"></line>
+            </svg>
+            <h2>CONVERSATION MESH</h2>
+          </div>
+          <div class="canvas-controls">
+            <button class="mode-btn active" data-mode="mesh">Mesh</button>
+            <button class="mode-btn" data-mode="cluster">Cluster</button>
+            <button class="mode-btn" data-mode="orbit">Orbit</button>
+          </div>
+        </div>
+
+        <div class="canvas-container">
+          <canvas id="neural-canvas"></canvas>
+          
+          <div class="canvas-overlay">
+            <div class="legend-item"><span class="legend-color cyan"></span> ChatGPT</div>
+            <div class="legend-item"><span class="legend-color purple"></span> Claude</div>
+            <div class="legend-item"><span class="legend-color green"></span> Gemini</div>
+          </div>
+          
+          <div class="canvas-instructions">
+            <span>Drag nodes &bull; Click to inspect &bull; Double-click to read the conversation</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Column: Memory Matrix & AI Stream Terminal -->
+      <section class="right-column">
+        
+        <!-- Top Right: Selected Node Vector Inspector -->
+        <div class="panel inspector-panel">
+          <div class="panel-header">
+            <div class="panel-title">
+              <svg class="panel-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                <line x1="8" y1="21" x2="16" y2="21"></line>
+                <line x1="12" y1="17" x2="12" y2="21"></line>
+              </svg>
+              <h2>CONVERSATION INSPECTOR</h2>
+            </div>
+            <div class="search-box">
+              <input type="text" id="memory-search" placeholder="Filter conversations…">
+            </div>
+          </div>
+
+          <div class="inspector-body" id="inspector-content">
+            <div class="node-badge" id="insp-badge">STORE</div>
+            <h3 class="node-title" id="insp-title">loading…</h3>
+            <p class="node-desc" id="insp-desc"></p>
+            
+            <div class="inspector-stats">
+              <div class="mini-stat">
+                <span class="lbl">Size</span>
+                <span class="val" id="insp-dim">—</span>
+              </div>
+              <div class="mini-stat">
+                <span class="lbl">Started</span>
+                <span class="val highlight-cyan" id="insp-weight">—</span>
+              </div>
+              <div class="mini-stat">
+                <span class="lbl">Provider</span>
+                <span class="val highlight-purple" id="insp-cluster">—</span>
+              </div>
+            </div>
+
+            <div class="vector-preview">
+              <span class="vec-label">FIRST MESSAGE:</span>
+              <code id="insp-vector"></code>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bottom Right: AI Stream Terminal & Speech Interface -->
+        <div class="panel terminal-panel">
+          <div class="panel-header">
+            <div class="panel-title">
+              <svg class="panel-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="4 17 10 11 4 5"></polyline>
+                <line x1="12" y1="19" x2="20" y2="19"></line>
+              </svg>
+              <h2>SEARCH TERMINAL</h2>
+            </div>
+            <div class="terminal-badges">
+              <span class="badge badge-pulse" id="engine-badge">CONNECTING…</span>
+            </div>
+          </div>
+
+          <div class="terminal-body" id="terminal-output">
+            <div class="terminal-msg system-msg">
+              <span class="msg-sender">[SYSTEM]</span>
+              <span class="msg-text">Connecting to the store…</span>
+            </div>
+          </div>
+
+          <!-- Reasoning Trace Box -->
+          <div class="thought-box hidden" id="thought-box">
+            <div class="thought-header">
+              <span class="thought-spinner"></span>
+              <span class="thought-title">QUERY TRACE</span>
+            </div>
+            <div class="thought-body" id="thought-content">
+              <!-- Dynamically populated thinking steps -->
+            </div>
+          </div>
+
+          <!-- Terminal Input Row -->
+          <form class="terminal-input-row" id="prompt-form">
+            <button type="button" id="btn-mic" class="mic-btn" title="Voice Input (Click to speak)">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                <line x1="12" y1="19" x2="12" y2="23"></line>
+                <line x1="8" y1="23" x2="16" y2="23"></line>
+              </svg>
+            </button>
+            <input type="text" id="prompt-input" placeholder="Search your conversations…" autocomplete="off" required>
+            <button type="submit" id="btn-send" class="send-btn">
+              <span>Search</span>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+              </svg>
+            </button>
+          </form>
+        </div>
+
+      </section>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
