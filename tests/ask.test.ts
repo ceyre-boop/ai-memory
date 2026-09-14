@@ -1,12 +1,13 @@
 // ask — retrieval through query.ts, prompt construction, expansion, --dry,
 // source attribution, with the Messages endpoint mocked. No real API calls.
 import { test, expect, beforeAll, afterAll } from "bun:test";
+import { fileURLToPath } from "node:url";
 import { mkdtempSync, rmSync, readFileSync, readdirSync, statSync, writeFileSync, chmodSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildUserMessage, SYSTEM_PROMPT, loadDotEnv, citedIndices, mergeHits } from "../scripts/lib/ask";
 
-const REPO = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const REPO = fileURLToPath(new URL("..", import.meta.url)).replace(/\/$/, "");
 const FIX = join(REPO, "tests", "fixtures");
 const KEY = "ask-passphrase-4!";
 let HOME: string;

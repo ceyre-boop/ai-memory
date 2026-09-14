@@ -2,13 +2,14 @@
 // SQLCipher, key handling, and the schema live in exactly one place.
 // See CONSTRAINTS.md — this file enforces: passphrase never logged, store always encrypted.
 import { Database } from "bun:sqlite";
+import { fileURLToPath } from "node:url";
 import { existsSync, mkdirSync, openSync, readSync, closeSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 
 export const ROOT =
   process.env.AI_MEMORY_HOME ??
-  new URL("../..", import.meta.url).pathname.replace(/\/$/, "");
+  fileURLToPath(new URL("../..", import.meta.url)).replace(/\/$/, "");
 export const DB_PATH = join(ROOT, "embeddings", "index.db");
 export const MANIFEST_PATH = join(ROOT, "manifest.json");
 

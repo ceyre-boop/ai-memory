@@ -3,9 +3,10 @@
 // (raw HTTP; this repo has no package dependencies by mandate) and returns an
 // answer grounded in those snippets. No key → no call.
 import { existsSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 
-const REPO = new URL("../..", import.meta.url).pathname.replace(/\/$/, "");
+const REPO = fileURLToPath(new URL("../..", import.meta.url)).replace(/\/$/, "");
 
 /** Load ANTHROPIC_API_KEY (and friends) from <repo>/.env if not already in env. Never logs values. */
 export function loadDotEnv(file = join(REPO, ".env")) {

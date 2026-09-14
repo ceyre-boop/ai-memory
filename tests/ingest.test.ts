@@ -1,11 +1,12 @@
 // Ingester tests — one fixture per provider, run through the real CLI against
 // a temp store. Never touches embeddings/index.db in the repo.
 import { test, expect, beforeAll, afterAll } from "bun:test";
+import { fileURLToPath } from "node:url";
 import { mkdtempSync, rmSync, cpSync, readFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const REPO = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const REPO = fileURLToPath(new URL("..", import.meta.url)).replace(/\/$/, "");
 const FIX = join(REPO, "tests", "fixtures");
 const KEY = "fixture-passphrase-Zq7!";
 let HOME: string;

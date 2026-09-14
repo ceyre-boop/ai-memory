@@ -8,6 +8,7 @@
 // passphrase never leaves the process; results come from the user's own
 // record or say "no matches". Nothing here fetches or generates anything.
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { openStore, counts, fail, ROOT, DB_PATH, readMeta } from "./lib/db";
 import { parseArgs, usage } from "./lib/cli";
 import type { Database } from "bun:sqlite";
@@ -19,7 +20,7 @@ usage: bun scripts/serve.ts [--port 3131] [--key-file <path>]
   Needs the passphrase (AI_MEMORY_KEY, --key-file, or prompt).
 `;
 
-const UI_DIR = new URL("../ui", import.meta.url).pathname;
+const UI_DIR = fileURLToPath(new URL("../ui", import.meta.url));
 const STATIC: Record<string, string> = {
   "/": "index.html",
   "/index.html": "index.html",

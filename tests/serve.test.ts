@@ -1,10 +1,11 @@
 // serve.ts — read-only JSON API over a temp store populated from the fixtures.
 import { test, expect, beforeAll, afterAll } from "bun:test";
+import { fileURLToPath } from "node:url";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const REPO = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const REPO = fileURLToPath(new URL("..", import.meta.url)).replace(/\/$/, "");
 const FIX = join(REPO, "tests", "fixtures");
 const KEY = "serve-passphrase-9!";
 let HOME: string;

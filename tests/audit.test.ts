@@ -1,5 +1,6 @@
 // Regression tests for the Cato audit findings (2026-09-14).
 import { test, expect } from "bun:test";
+import { fileURLToPath } from "node:url";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync, existsSync, readdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -7,7 +8,7 @@ import { parseChatGPT } from "../scripts/lib/parsers/chatgpt";
 import { parseClaude } from "../scripts/lib/parsers/claude";
 import { KEY, makeHome, run, cleanup } from "./helpers";
 
-const REPO = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const REPO = fileURLToPath(new URL("..", import.meta.url)).replace(/\/$/, "");
 const FIX = join(REPO, "tests", "fixtures");
 
 test("push never carries .env, *.key, wip/ or corpus/ to the target, and --dry leaves no probe", () => {
@@ -106,6 +107,19 @@ test("counts(strict) fails loudly on a missing table; lenient reads 0", async ()
     expect(() => counts(db, true)).toThrow(/count failed/);
     db.close();
   } finally { cleanup(home); }
+});
+
+test("a store home with a space in its path works (removable media like '/Volumes/NO NAME')", () => {
+  const home = join(mkdtempSync(join(tmpdir(), "ai-memory space ")), "my store");
+  mkdirSync(join(home, "embeddings"), { recursive: true });
+  try {
+    const r = run("ingest.ts", [join(FIX, "claude")], { AI_MEMORY_HOME: home });
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain("store now 2 conversations");
+    const q = run("query.ts", ["Lisbon", "--limit", "1"], { AI_MEMORY_HOME: home });
+    expect(q.code).toBe(0);
+    expect(q.stdout).toContain("Trip planning for Lisbon");
+  } finally { rmSync(join(home, ".."), { recursive: true, force: true }); }
 });
 
 test("child processes never inherit the passphrase (push spawns rsync/du/df with a scrubbed env)", () => {
