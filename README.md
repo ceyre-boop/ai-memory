@@ -14,13 +14,49 @@ clinical and research work needs and cannot put in a cloud.
 
 ## The demo
 
+![Chip in: cited answer. Chip out: honest refusal. Chip in: recovery.](docs/ai-memory-jarvis-demo.gif)
+
+The frame that matters is the middle one. Any assistant can answer when retrieval works. The one
+above refuses instead of guessing the moment its record is gone — that's the difference between
+memory and a model that hallucinates when the lookup fails, and it's the whole argument this
+project is making. Recorded live against the real store, served straight off the encrypted SD card:
+
+```
+▸ What did I tell you about my commute to Flint?
+[AI] Thirty-five minutes by car from Owosso to Flint, assessed as manageable [1]. That came up
+     while house-hunting in Owosso, on the basis that you attend University of Michigan Flint
+     and Mott [2].
+Sources: [1] Finding the perfect house in Owosso · 2026-06-16 · [2] same thread
+
+                              ── the drive comes out ──
+
+▸ And what about the neighborhood I liked there?
+[SYSTEM] Memory store went away (drive unplugged?). I can talk, but I cannot remember anything
+         for you until it is back.
+[AI] I couldn't say, sir — the memory store is offline at the moment, so I have nothing to draw
+     on beyond what we've already discussed…
+
+                              ── the drive goes back in ──
+
+▸ And what about the neighborhood I liked there?
+[AI] The record is back, sir — my apologies. The neighborhood in question is Ardelean, on the
+     north side of Owosso: the city's most desirable area with the best resale floor, and the
+     first one to call about [2][4]. Nothing in the record about a neighborhood in Flint itself.
+```
+
+No retry logic papered over that gap. No fallback to what the model would guess. It didn't know,
+and it said so — because the only thing standing between "here's your answer" and "not in your
+record" is whether the chip is in the drive.
+
+Run it yourself:
+
 ```sh
 bun scripts/serve.ts --key-file ~/.config/ai-memory/key     # the store, loopback only
 bun scripts/ask.ts "What did I decide about the house?"      # answer + cited sources, or "Not in your record."
 ```
 
-Then pull the drive. The assistant keeps talking and stops remembering: "memory store offline".
-Plug it back in and the record returns. That gesture is the whole thesis.
+Then pull the drive mid-conversation. The assistant keeps talking and stops remembering:
+"memory store offline". Plug it back in and the record returns. That gesture is the whole thesis.
 
 ## What is hard here
 
@@ -89,6 +125,7 @@ scripts/lib/          openStore(), key handling, schema, parsers, ask (the one o
 ui/                   the display served by serve.ts (canvas of conversations, search terminal)
 tests/                bun test; fixtures/ holds one synthetic export per provider
 docs/ON-THE-DRIVE.md  ships with every push; says what is on the media and what cannot open it
+docs/*.gif             the chip-in / chip-out demo recording
 embeddings/index.db   the store (SQLCipher) — the corpus lives here
 corpus/               your plaintext inbox; never written by the system, never pushed
 manifest.json         stats and verified pushes; no secrets
