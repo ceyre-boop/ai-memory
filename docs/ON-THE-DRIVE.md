@@ -33,3 +33,7 @@ bun scripts/ask.ts "a question about your own history"   # needs the claude CLI 
 
 `bun scripts/push.ts /Volumes/<this drive> --pull` copies the store back to a machine — after
 verifying the copy opens with the passphrase, never before.
+
+## Before you pull this drive
+
+Run `bun scripts/push.ts /Volumes/<this drive> --eject` instead of dragging it to the Trash. It checkpoints the encrypted database — the same step that runs before every copy — reopens it fresh to prove the file is self-contained, and only then ejects. If that check fails, the eject does not happen, and the drive stays mounted with nothing pending. A plain unmount from Finder skips that check; it usually works fine, but "usually" is not the standard this store holds itself to anywhere else.

@@ -15,10 +15,11 @@ import {
   type Counts,
 } from "./lib/db.ts";
 import { fmtInt, parseArgs, usage } from "./lib/cli.ts";
-import { existsSync, mkdirSync, readdirSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, realpathSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-const USAGE = "usage: bun scripts/push.ts <target> [--dry] [--pull] [--key-file path]";
+// --eject: checkpoint + verify the active store (if it lives on <target>) before diskutil-ejecting it.
+const USAGE = "usage: bun scripts/push.ts <target> [--dry] [--pull] [--eject] [--key-file path]";
 // Allowlist, not a blocklist: only these top-level entries ever reach media.
 // .env, *.key, corpus/, wip/, .git/ can never ride along by omission.
 const COPY_ENTRIES = ["embeddings", "scripts", "ui", "tests", "docs", "manifest.json", "package.json", "CONSTRAINTS.md", "README.md", "ISA.md"];
@@ -331,27 +332,106 @@ function requireHumanOperator(dry: boolean): void {
   if (dry) return;
   if (process.env.CLAUDECODE) {
     throw new StoreError(
-      "refusing to write to removable media from inside an AI coding session (CLAUDECODE is set) — " +
-      "run this command yourself in a normal terminal. --dry still works from here.",
+      "refusing to touch removable media from inside an AI coding session (CLAUDECODE is set) — " +
+      "writing, pulling, and ejecting are all a human act here. Run this command yourself in a " +
+      "normal terminal. --dry still works from here.",
     );
   }
+}
+
+/** Is the currently active store (AI_MEMORY_HOME) physically located on this volume? */
+function isUnderTarget(target: string): boolean {
+  try {
+    const realTarget = realpathSync(target);
+    const realRoot = realpathSync(ROOT);
+    return realRoot === realTarget || realRoot.startsWith(realTarget + "/");
+  } catch {
+    return false;
+  }
+}
+
+/** Reopen readonly and prove a clean count, without the sidecar cleanup verifyTarget() does for a freshly-copied target. */
+function verifyCleanReopen(path: string, key: string): Counts {
+  const db = openStore({ path, key, readonly: true });
+  try {
+    return counts(db, true);
+  } finally {
+    db.close();
+  }
+}
+
+/**
+ * Safe-eject. `diskutil eject` alone only refuses a volume with an open file
+ * handle — it knows nothing about whether the SQLCipher WAL was mid-write.
+ * When the active store lives on this volume, checkpoint it (TRUNCATE, same
+ * as push does before copying) and reopen it fresh to prove the main db file
+ * is self-contained and clean *before* the media physically leaves. If that
+ * check doesn't pass, the eject does not happen.
+ */
+async function eject(target: string, dry: boolean): Promise<void> {
+  const onTarget = isUnderTarget(target);
+  const plaintext = onTarget ? isPlaintextSqlite(DB_PATH) : null;
+
+  if (dry) {
+    console.log(`target: ${target}`);
+    console.log(onTarget
+      ? `active store IS on this volume (${ROOT}) — would checkpoint + verify before ejecting`
+      : `active store is NOT on this volume (active store: ${ROOT}) — would eject with no store-specific check`);
+    if (onTarget && plaintext) {
+      console.log("note: the store on this volume is plaintext SQLite — nothing to checkpoint here; encrypt.ts migrate first if you want this guarantee");
+    }
+    console.log(`would run: diskutil eject ${target}`);
+    console.log("\nDRY RUN — nothing checkpointed, nothing ejected");
+    return;
+  }
+
+  if (onTarget && !plaintext) {
+    const key = getKey(process.argv.slice(2));
+    const before = checkpointAndCount(key);
+    console.log("✓ WAL checkpointed — index.db is self-contained");
+    const after = verifyCleanReopen(DB_PATH, key);
+    if (describeCounts(before) !== describeCounts(after)) {
+      throw new StoreError(`store did not reopen clean after checkpoint — refusing to eject\nbefore: ${describeCounts(before)}\nafter: ${describeCounts(after)}`);
+    }
+    console.log(`✓ reopened clean: ${fmtInt(after.chunks)} chunks · ${fmtInt(after.files)} files · ${fmtInt(after.conversations)} conversations · ${fmtInt(after.messages)} messages`);
+    console.log("✓ safe to eject: nothing pending, store reopens clean");
+  } else if (onTarget && plaintext) {
+    console.log("⚠ the store on this volume is plaintext SQLite — nothing to checkpoint/verify; ejecting anyway (encrypt.ts migrate first for this guarantee)");
+  } else {
+    console.log(`active store is not on ${target} (it's at ${ROOT}) — ejecting with no store-specific check`);
+  }
+
+  runCommand("diskutil", ["eject", target]);
+  for (let i = 0; i < 20 && targetIsMountedDirectory(target); i++) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  if (targetIsMountedDirectory(target)) throw new StoreError(`${target} still mounted after eject — check Finder or another process holding it open`);
+  console.log(`✓ ${target} ejected — safe to remove`);
 }
 
 async function main(): Promise<void> {
   let parsed;
   try {
-    parsed = parseArgs(process.argv.slice(2), ["dry", "pull", "help"], []);
+    parsed = parseArgs(process.argv.slice(2), ["dry", "pull", "eject", "help"], []);
   } catch (error) {
     usage(`${usageText()}\n${errorMessage(error)}`);
   }
   if (parsed.flags.has("help") || parsed.positional.length !== 1) usage(usageText());
+  if (parsed.flags.has("pull") && parsed.flags.has("eject")) usage("--pull and --eject are mutually exclusive");
 
   const dry = parsed.flags.has("dry");
   requireHumanOperator(dry);
 
   const target = parsed.positional[0];
-  // --dry must not touch the target: the write probe runs only on a real push.
+  // --dry must not touch the target: the write probe (and, for --eject, the
+  // physical eject itself) only runs on a real invocation.
   if (!targetIsMountedDirectory(target)) throw new StoreError(`${target} not mounted. Plug it in.`);
+
+  if (parsed.flags.has("eject")) {
+    await eject(target, dry);
+    return;
+  }
+
   const destination = join(target, "ai-memory");
   if (parsed.flags.has("pull")) {
     pull(destination, dry);

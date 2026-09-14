@@ -5,10 +5,10 @@ project: ai-memory
 effort: deep
 effort_source: classifier
 phase: complete
-progress: 182/182
+progress: 198/198
 mode: interactive
 started: 2026-09-13T23:49:58Z
-updated: 2026-09-14T03:30:00Z
+updated: 2026-09-14T05:00:00Z
 ---
 
 ## Problem
@@ -269,6 +269,24 @@ CONSTRAINTS.md is committed first; `bun scripts/ingest.ts <archive>` ingests Cha
 - [x] ISC-182: A second push to a full target only needs room for the growth (`already on target … needs 0.01 GB more`).
 - [x] ISC-176: Stopwords are dropped from FTS OR-queries when other terms remain, so paraphrased questions rank on content words.
 
+### Contradiction detection + safe eject (2026-09-14, user-directed)
+- [x] ISC-183: `scripts/contradictions.ts` retrieves through `query.ts` search() only; no second retrieval path.
+- [x] ISC-184: The system prompt requires a contradiction to be the same specific claim asserted incompatibly, not an evolving plan or differing opinion, and instructs silence when unsure.
+- [x] ISC-185: Every printed date/title/provider for a reported contradiction comes from the real retrieved Hit, never from the model's own text; a citation outside [1, hits.length] or citing the same snippet for both sides is dropped, not trusted.
+- [x] ISC-186: `--dry` shows retrieved snippets + the assembled prompt and calls nothing.
+- [x] ISC-187: Fewer than 2 retrieved snippets → nothing sent to the model.
+- [x] ISC-188: "NO CONTRADICTIONS FOUND." (case-insensitive) is recognized and reported honestly; an unparsable reply is shown as-is with a caution note rather than silently dropped or invented.
+- [x] ISC-189: Live on the real 236-conversation store: two real topics both correctly returned no contradiction (no false positive forced).
+- [x] ISC-190: `contradictions.ts` adds no new outbound-network file; it calls `lib/ask.ts` only (the existing "one file" test covers it automatically).
+- [x] ISC-191: `push.ts --eject <target>` refuses from inside an AI session (same CLAUDECODE guard as push/pull); `--dry` still works.
+- [x] ISC-192: `--eject` and `--pull` are mutually exclusive.
+- [x] ISC-193: When the active store lives on the target and is encrypted, `--eject` checkpoints (WAL TRUNCATE) and reopens readonly to prove a clean, matching count *before* calling diskutil; a mismatch refuses the eject.
+- [x] ISC-194: A plaintext store on the target still ejects, with an explicit note that the checkpoint guarantee was skipped.
+- [x] ISC-195: A target not backing the active store still ejects, with a note that no store-specific check applied.
+- [x] ISC-196: `--eject` drives the real `diskutil` binary by name via PATH (not a hardcoded path) and polls after calling it, refusing to declare success until the target is confirmed gone.
+- [x] ISC-197: A failing diskutil call (busy volume) leaves the target mounted and push.ts exits non-zero with diskutil's own reason.
+- [x] ISC-198: Live against the real mounted chip: `--eject --dry` correctly detects the active store is on `/Volumes/AIMEMORY`; the real (non-dry) form is refused from this session, chip left mounted and untouched.
+
 ## Test Strategy
 
 | isc | type | check | threshold | tool |
@@ -332,6 +350,10 @@ CONSTRAINTS.md is committed first; `bun scripts/ingest.ts <archive>` ingests Cha
 
 - 2026-09-14T03:30Z — First push to the card (/Volumes/NO NAME, 32 GB FAT32 SD, 2.47 GB free): 1265 s copy at ~2 MB/s, verified 905,207 chunks · 54,614 files · 116 conversations · 2,418 messages. Running from the card exposed three bugs, all fixed with tests: undecoded import.meta.url paths (NO%20NAME), count(*) over FTS content (10-minute startup), capacity check ignoring what is already on the target. Card caveat surfaced to the user: FAT32 (4 GB file cap) and 28 GB of deleted clips in .Trashes leave no headroom.
 
+- 2026-09-14T05:00Z — User directed the next three, in order: commit the isolated crash-guard fix + README lead with the offline-refusal frame, contradiction detection, safe-eject in push.ts. All three shipped this pass.
+- 2026-09-14T05:00Z — Contradiction detection deliberately biased toward silence per the character contract (admits empty results rather than inventing): two live real-topic trials both returned 'no contradiction' rather than force a match. Precision on a true positive is proven only by the mocked test; a real one hasn't yet been found in the live corpus.
+- 2026-09-14T05:00Z — Safe-eject reuses push's own checkpoint step rather than inventing a new one; the value-add over a bare `diskutil eject` is proving the checkpoint reopens clean *before* the physical eject, not just that no file handle is open.
+
 ## Changelog
 
 - 2026-09-13T23:49Z — conjectured: `corpus/` must itself be encrypted to satisfy the hard rule. refuted_by: FirstPrinciples challenge — the rule forbids the *system* writing plaintext there; documents can live inside the encrypted DB. learned: name the corpus correctly and the second encryption layer disappears. criterion_now: ISC-44 (no script writes under corpus/) and ISC-129 (push excludes corpus/).
@@ -344,7 +366,13 @@ CONSTRAINTS.md is committed first; `bun scripts/ingest.ts <archive>` ingests Cha
 
 - 2026-09-14T03:30Z — conjectured: a verified copy on media is enough to call the drive story done. refuted_by: the first run from the card hung ten minutes and JARVIS timed out; the copy was fine, the runtime assumptions (fast disk, decoded paths) were not. learned: "runs from the chip" is its own criterion and must be probed on real media, not inferred from a verified copy. criterion_now: ISC-180, ISC-181.
 
+- 2026-09-14T05:00Z — conjectured: `diskutil eject`'s own busy-volume refusal is enough protection for a SQLCipher WAL store. refuted_by: FirstPrinciples-style challenge from the user — an open file handle and a mid-write WAL are different risks; diskutil checks the former, not the latter. learned: safety here means proving a clean reopen, not just an absent lock. criterion_now: ISC-193.
+
 ## Verification
+
+- ISC-183..190: `bun test tests/contradictions.test.ts` → 9 pass; live `contradictions.ts "house budget for Owosso"` and `"the fade trading edge golden rule"` against the real chip → both "No contradictions found on this topic in the retrieved record."
+- ISC-191..198: `bun test tests/audit.test.ts` → 12 pass including 4 eject tests (fake-diskutil proves checkpoint→reopen→eject→confirm, plaintext note, unrelated-target note, and a failing diskutil leaving the target mounted); live `--eject --dry` against `/Volumes/AIMEMORY` → "active store IS on this volume"; live `--eject` (real) from this session → refused, chip still mounted (`ls /Volumes` shows AIMEMORY present after).
+- `bun test` (full suite) → 85 pass, 0 fail across 8 files.
 
 - ISC-180..182: chip demo transcript 2026-09-14 — store up from the card in 1 s; search 0.081 s / 0.003 s / 0.003 s; JARVIS: "Owosso to Flint, roughly thirty-five minutes by car… [1]" with two cited sources; store stopped → "the memory store is offline, so nothing came back… worth asking again once the store reconnects"; restarted from the card in 2 s → neighborhood answer with three citations. `push` re-sync + verification on the card: 7.2 s total.
 

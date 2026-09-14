@@ -74,6 +74,10 @@ Then pull the drive mid-conversation. The assistant keeps talking and stops reme
   secret-looking, then reopens the index *on the drive* with the key and counts rows before it says
   "verified". `--pull` holds the reverse direction to the same rule. A cross-vendor audit found the
   original blocklist would have carried `.env` onto the chip; the fix ships with a regression test.
+- **A drive you can pull without wondering.** `diskutil eject` only refuses a volume with an open file
+  handle — it says nothing about whether the SQLCipher WAL was mid-write. `push --eject` checkpoints the
+  store first (same TRUNCATE step as before a copy), reopens it fresh to prove the file is
+  self-contained, and only then calls eject; if that reopen doesn't verify, the eject does not happen.
 - **An informed no.** `ask` retrieves through one search path (FTS5, stopwords dropped, optional
   keyword expansion), sends only the question and the top-k snippets, and the prompt forbids outside
   knowledge. The answer cites `[n]`; the CLI prints the thread title and date for every citation.
@@ -111,7 +115,7 @@ the Messages API instead, set `AI_MEMORY_PROVIDER=api` and put `ANTHROPIC_API_KE
 | `bun scripts/encrypt.ts migrate\|rekey\|check [--dry]` | Migrate a plaintext index to SQLCipher, change the passphrase, or report the state. |
 | `bun scripts/forget.ts <conversation-id> \| --provider X [--dry]` | Delete conversations and their search entries together. |
 | `bun scripts/status.ts` | Encryption state, row counts, recorded pushes. |
-| `bun scripts/push.ts /Volumes/CHIP [--dry] [--pull]` | Copy the store to media and verify it there. Refuses plaintext; never carries secrets. |
+| `bun scripts/push.ts /Volumes/CHIP [--dry] [--pull] [--eject]` | Copy the store to media and verify it there. Refuses plaintext; never carries secrets. `--eject`: checkpoint + reopen-clean the store if it lives on that volume, then diskutil-eject — refuses to declare success if the checkpoint doesn't verify. |
 | `bun scripts/serve.ts [--port 3131]` | Loopback display and read-only JSON API over the store (`ui/`). |
 
 `--dry` prints the plan and writes nothing. Every bulk or destructive command has it.
@@ -142,5 +146,5 @@ ISA.md                the system of record for how this was built and verified
 ## tests
 
 ```sh
-bun test        # 81 tests: parsers, crypto migration, push/pull, ask + contradictions (model endpoint mocked), audit regressions
+bun test        # 85 tests: parsers, crypto migration, push/pull, ask + contradictions (model endpoint mocked), audit regressions
 ```
