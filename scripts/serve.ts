@@ -35,11 +35,7 @@ const MIME: Record<string, string> = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json; charset=utf-8" } });
 
-/** FTS5-safe query: each whitespace term becomes a quoted phrase, ORed. */
-export function ftsQuery(q: string): string {
-  const terms = q.trim().split(/\s+/).filter(Boolean).map((t) => `"${t.replace(/"/g, '""')}"`);
-  return terms.join(" OR ");
-}
+import { search, ftsQuery } from "./query";
 
 const CLUSTER: Record<string, string> = { chatgpt: "ChatGPT", claude: "Claude", gemini: "Gemini" };
 
@@ -67,12 +63,6 @@ export function buildApi(db: Database) {
     FROM h JOIN conversations c ON c.id = h.cid GROUP BY c.id ORDER BY score LIMIT ?`);
   const convOne = db.prepare("SELECT * FROM conversations WHERE id = ?");
   const convMsgs = db.prepare("SELECT seq, role, created_at, body, parent_id, on_main_path, content_types FROM messages WHERE conversation_id = ? ORDER BY seq");
-  const searchMsgs = db.prepare(`SELECT m.id, m.role, m.created_at, c.provider, c.title, c.id AS conversation_id,
-      snippet(messages_fts, 0, '«', '»', '…', 24) AS snippet, bm25(messages_fts) AS score
-    FROM messages_fts JOIN messages m ON m.rid = messages_fts.rowid JOIN conversations c ON c.id = m.conversation_id
-    WHERE messages_fts MATCH ? ORDER BY score LIMIT ?`);
-  const searchFiles = db.prepare(`SELECT path, snippet(chunks, 1, '«', '»', '…', 24) AS snippet, bm25(chunks) AS score
-    FROM chunks WHERE chunks MATCH ? ORDER BY score LIMIT ?`);
 
   return {
     telemetry() {
@@ -97,13 +87,9 @@ export function buildApi(db: Database) {
       if (!c) return null;
       return { ...c, cluster: CLUSTER[c.provider as string] ?? c.provider, thread_inferred: !!c.thread_inferred, messages: convMsgs.all(id) };
     },
+    /** One retrieval path for the whole product: query.ts search(). */
     search(q: string, limit: number, source: "all" | "conv" | "files") {
-      const fq = ftsQuery(q);
-      if (!fq) return { query: q, results: [] };
-      const conv = source === "files" ? [] : (searchMsgs.all(fq, limit) as Record<string, unknown>[]).map((r) => ({ kind: "conversation", ...r }));
-      const files = source === "conv" ? [] : (searchFiles.all(fq, limit) as Record<string, unknown>[]).map((r) => ({ kind: "file", ...r }));
-      const results = [...conv, ...files].sort((a, b) => (a.score as number) - (b.score as number)).slice(0, limit);
-      return { query: q, results };
+      return { query: q, results: search(db, q, { limit, source }) };
     },
   };
 }

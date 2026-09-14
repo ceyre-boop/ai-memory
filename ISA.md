@@ -5,10 +5,10 @@ project: ai-memory
 effort: deep
 effort_source: classifier
 phase: complete
-progress: 177/177
+progress: 179/179
 mode: interactive
 started: 2026-09-13T23:49:58Z
-updated: 2026-09-14T02:00:00Z
+updated: 2026-09-14T02:30:00Z
 ---
 
 ## Problem
@@ -262,6 +262,8 @@ CONSTRAINTS.md is committed first; `bun scripts/ingest.ts <archive>` ingests Cha
 - [x] ISC-174: Anti: outbound network code exists only in `scripts/lib/ask.ts` (test walks scripts/).
 - [x] ISC-175: Default retrieval source is the conversations table; `--source files|all` widens it.
 - [x] ISC-177: `AI_MEMORY_PROVIDER` defaults to `claude-cli`: the signed-in Claude Code CLI runs the call on the user subscription with `--tools "" --strict-mcp-config --setting-sources "" --no-session-persistence`, env scrubbed of CLAUDECODE/ANTHROPIC_* (fake-binary test checks every flag); `api` uses the Messages API.
+- [x] ISC-178: `serve.ts` `/api/search` delegates to `query.ts` `search()`; the product has one retrieval implementation (grep: FTS SQL only in query.ts).
+- [x] ISC-179: `docs/ON-THE-DRIVE.md` ships on media (allowlisted) and states that nothing on the drive can open the store.
 - [x] ISC-176: Stopwords are dropped from FTS OR-queries when other terms remain, so paraphrased questions rank on content words.
 
 ## Test Strategy
@@ -322,6 +324,8 @@ CONSTRAINTS.md is committed first; `bun scripts/ingest.ts <archive>` ingests Cha
 - 2026-09-14T01:30Z — Test deadlock found and fixed: spawning the CLI synchronously while the mock model endpoint lives in the test process blocks the event loop; the CLI must be spawned async.
 
 - 2026-09-14T02:00Z — User: no API spend; bill the Max subscription. Added the claude-cli provider (default) mirroring PAI Inference.ts. First live JARVIS turn claimed access to mail/calendar/brokerage — the CLI had attached the user MCP servers; `--strict-mcp-config` now drops them in both ask.ts and the display server.
+
+- 2026-09-14T02:30Z — JARVIS wired: the display server retrieves from `/api/search` on the ai-memory backend over loopback, grounds the persona in the snippets with per-session history, answers via the CLI, returns sources separately (shown, not spoken). Live: Owosso decision answered with 5 cited sources in 6.1 s; follow-up refused with history in 4.4 s.
 
 ## Changelog
 

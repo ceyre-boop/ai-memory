@@ -21,7 +21,7 @@ import { join } from "node:path";
 const USAGE = "usage: bun scripts/push.ts <target> [--dry] [--pull] [--key-file path]";
 // Allowlist, not a blocklist: only these top-level entries ever reach media.
 // .env, *.key, corpus/, wip/, .git/ can never ride along by omission.
-const COPY_ENTRIES = ["embeddings", "scripts", "ui", "tests", "manifest.json", "package.json", "CONSTRAINTS.md", "README.md", "ISA.md"];
+const COPY_ENTRIES = ["embeddings", "scripts", "ui", "tests", "docs", "manifest.json", "package.json", "CONSTRAINTS.md", "README.md", "ISA.md"];
 const NEVER_COPIED = "corpus/, .git/, node_modules/, wip/, .env*, *.key, *.db-wal, *.db-shm";
 const EXCLUDES = ["*.db-wal", "*.db-shm", ".env", ".env.*", "*.key", "node_modules/"];
 const SECRET_NAME = /^\.env(\..*)?$|\.key$/;
