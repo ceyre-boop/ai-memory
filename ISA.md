@@ -5,10 +5,10 @@ project: ai-memory
 effort: deep
 effort_source: classifier
 phase: complete
-progress: 179/179
+progress: 182/182
 mode: interactive
 started: 2026-09-13T23:49:58Z
-updated: 2026-09-14T02:30:00Z
+updated: 2026-09-14T03:30:00Z
 ---
 
 ## Problem
@@ -264,6 +264,9 @@ CONSTRAINTS.md is committed first; `bun scripts/ingest.ts <archive>` ingests Cha
 - [x] ISC-177: `AI_MEMORY_PROVIDER` defaults to `claude-cli`: the signed-in Claude Code CLI runs the call on the user subscription with `--tools "" --strict-mcp-config --setting-sources "" --no-session-persistence`, env scrubbed of CLAUDECODE/ANTHROPIC_* (fake-binary test checks every flag); `api` uses the Messages API.
 - [x] ISC-178: `serve.ts` `/api/search` delegates to `query.ts` `search()`; the product has one retrieval implementation (grep: FTS SQL only in query.ts).
 - [x] ISC-179: `docs/ON-THE-DRIVE.md` ships on media (allowlisted) and states that nothing on the drive can open the store.
+- [x] ISC-180: The store runs from removable media: `bun /Volumes/<card>/ai-memory/scripts/serve.ts` opens the index on the card (lsof shows the card path), search 81 ms cold / 3 ms warm, JARVIS answers with citations; stopping the store yields an honest "memory store offline" and restarting restores answers within seconds.
+- [x] ISC-181: `counts()` reads `chunks_docsize`; store startup and push verification on an SD card take under a second instead of ~10 minutes.
+- [x] ISC-182: A second push to a full target only needs room for the growth (`already on target … needs 0.01 GB more`).
 - [x] ISC-176: Stopwords are dropped from FTS OR-queries when other terms remain, so paraphrased questions rank on content words.
 
 ## Test Strategy
@@ -327,6 +330,8 @@ CONSTRAINTS.md is committed first; `bun scripts/ingest.ts <archive>` ingests Cha
 
 - 2026-09-14T02:30Z — JARVIS wired: the display server retrieves from `/api/search` on the ai-memory backend over loopback, grounds the persona in the snippets with per-session history, answers via the CLI, returns sources separately (shown, not spoken). Live: Owosso decision answered with 5 cited sources in 6.1 s; follow-up refused with history in 4.4 s.
 
+- 2026-09-14T03:30Z — First push to the card (/Volumes/NO NAME, 32 GB FAT32 SD, 2.47 GB free): 1265 s copy at ~2 MB/s, verified 905,207 chunks · 54,614 files · 116 conversations · 2,418 messages. Running from the card exposed three bugs, all fixed with tests: undecoded import.meta.url paths (NO%20NAME), count(*) over FTS content (10-minute startup), capacity check ignoring what is already on the target. Card caveat surfaced to the user: FAT32 (4 GB file cap) and 28 GB of deleted clips in .Trashes leave no headroom.
+
 ## Changelog
 
 - 2026-09-13T23:49Z — conjectured: `corpus/` must itself be encrypted to satisfy the hard rule. refuted_by: FirstPrinciples challenge — the rule forbids the *system* writing plaintext there; documents can live inside the encrypted DB. learned: name the corpus correctly and the second encryption layer disappears. criterion_now: ISC-44 (no script writes under corpus/) and ISC-129 (push excludes corpus/).
@@ -337,7 +342,11 @@ CONSTRAINTS.md is committed first; `bun scripts/ingest.ts <archive>` ingests Cha
 
 - 2026-09-14T01:30Z — conjectured: OR-ing every whitespace term is enough for FTS5 retrieval. refuted_by: "When should I stop trading a signal that used to work?" ranked chunks on "to", "I", "that" and returned unrelated transcripts. learned: function words carry no rank signal and must be dropped when content words remain; the conversations table, not swept files, is the record. criterion_now: ISC-175, ISC-176.
 
+- 2026-09-14T03:30Z — conjectured: a verified copy on media is enough to call the drive story done. refuted_by: the first run from the card hung ten minutes and JARVIS timed out; the copy was fine, the runtime assumptions (fast disk, decoded paths) were not. learned: "runs from the chip" is its own criterion and must be probed on real media, not inferred from a verified copy. criterion_now: ISC-180, ISC-181.
+
 ## Verification
+
+- ISC-180..182: chip demo transcript 2026-09-14 — store up from the card in 1 s; search 0.081 s / 0.003 s / 0.003 s; JARVIS: "Owosso to Flint, roughly thirty-five minutes by car… [1]" with two cited sources; store stopped → "the memory store is offline, so nothing came back… worth asking again once the store reconnects"; restarted from the card in 2 s → neighborhood answer with three citations. `push` re-sync + verification on the card: 7.2 s total.
 
 - ISC-177 + live: `bun scripts/ask.ts "When should I stop trading a signal that used to work?"` → expanded with 3 variants, answered "Not in your record." with an honest summary of the two nearest threads and cited sources, 9.2 s via `opus via claude CLI (subscription)`; `"What colour did I paint the kitchen?"` → "Not in your record." citing the Owosso house thread as the only kitchen mentions, 6.1 s. `bun test` → 70 pass.
 
