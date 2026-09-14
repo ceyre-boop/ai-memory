@@ -38,7 +38,10 @@ context and rent the model. This is memory infrastructure, nothing more.
   matching snippets to the model provider you configure — by default the `claude` CLI signed in to your
   own subscription, or the Messages API with `ANTHROPIC_API_KEY` (read from `.env`, never logged, never
   in output) when `AI_MEMORY_PROVIDER=api`. No provider → no call; `--dry` shows exactly what would be
-  sent and sends nothing. Never the passphrase, never the whole store. A test enforces that `scripts/lib/ask.ts` is the
+  sent and sends nothing.
+  `contradictions` shares that same one file, same provider, same rule — it sends a topic plus the
+  top-k snippets and nothing else, to find where your own record asserts one thing at two different
+  times, not to judge which is true. Never the passphrase, never the whole store. A test enforces that `scripts/lib/ask.ts` is the
   only outbound network code in the repository.
 - Never writes plaintext into `corpus/`. That folder is an inbox you control; the store is the
   encrypted database. `push` never copies `corpus/` to removable media.
