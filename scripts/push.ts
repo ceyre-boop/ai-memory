@@ -324,6 +324,19 @@ function pull(destination: string, dry: boolean): void {
   console.log(`✓ pulled and verified: ${describeCounts(localCounts)}`);
 }
 
+// CONSTRAINTS.md: copying to media is a human act. Inside an AI coding
+// session (CLAUDECODE set), every write path is refused; --dry still works
+// so the assistant can show what it *would* do, never do it.
+function requireHumanOperator(dry: boolean): void {
+  if (dry) return;
+  if (process.env.CLAUDECODE) {
+    throw new StoreError(
+      "refusing to write to removable media from inside an AI coding session (CLAUDECODE is set) — " +
+      "run this command yourself in a normal terminal. --dry still works from here.",
+    );
+  }
+}
+
 async function main(): Promise<void> {
   let parsed;
   try {
@@ -333,15 +346,18 @@ async function main(): Promise<void> {
   }
   if (parsed.flags.has("help") || parsed.positional.length !== 1) usage(usageText());
 
+  const dry = parsed.flags.has("dry");
+  requireHumanOperator(dry);
+
   const target = parsed.positional[0];
   // --dry must not touch the target: the write probe runs only on a real push.
   if (!targetIsMountedDirectory(target)) throw new StoreError(`${target} not mounted. Plug it in.`);
   const destination = join(target, "ai-memory");
   if (parsed.flags.has("pull")) {
-    pull(destination, parsed.flags.has("dry"));
+    pull(destination, dry);
     return;
   }
-  await push(target, destination, parsed.flags.has("dry"));
+  await push(target, destination, dry);
 }
 
 try {

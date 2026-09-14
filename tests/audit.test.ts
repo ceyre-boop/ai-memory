@@ -128,3 +128,31 @@ test("child processes never inherit the passphrase (push spawns rsync/du/df with
   const ingest = readFileSync(join(REPO, "scripts", "ingest.ts"), "utf8");
   expect(ingest).toMatch(/Bun\.spawn\(\["unzip", "-p"[^\n]*env \}\)/);
 });
+
+test("push refuses to write to media from inside an AI session (CLAUDECODE set); --dry still works", () => {
+  const home = makeHome();
+  const target = mkdtempSync(join(tmpdir(), "ai-memory-chip-guard-"));
+  try {
+    expect(run("ingest.ts", [join(FIX, "claude")], { AI_MEMORY_HOME: home }).code).toBe(0);
+
+    // simulate running from inside an AI coding session
+    const dry = run("push.ts", [target, "--dry"], { AI_MEMORY_HOME: home, CLAUDECODE: "1" });
+    expect(dry.code).toBe(0);
+    expect(readdirSync(target)).toEqual([]);
+
+    const real = run("push.ts", [target], { AI_MEMORY_HOME: home, CLAUDECODE: "1" });
+    expect(real.code).not.toBe(0);
+    expect(real.stderr).toContain("refusing to write to removable media from inside an AI coding session");
+    expect(readdirSync(target)).toEqual([]);
+
+    // the same command, run as if from a normal terminal, is allowed
+    const human = run("push.ts", [target], { AI_MEMORY_HOME: home });
+    expect(human.code).toBe(0);
+    expect(existsSync(join(target, "ai-memory", "embeddings", "index.db"))).toBe(true);
+
+    // --pull is a write to the local primary and is refused the same way
+    const pullGuard = run("push.ts", [target, "--pull"], { AI_MEMORY_HOME: home, CLAUDECODE: "1" });
+    expect(pullGuard.code).not.toBe(0);
+    expect(pullGuard.stderr).toContain("refusing to write to removable media from inside an AI coding session");
+  } finally { cleanup(home); rmSync(target, { recursive: true, force: true }); }
+});

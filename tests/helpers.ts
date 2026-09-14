@@ -28,12 +28,19 @@ export function run(
   const home = env.AI_MEMORY_HOME;
   if (!home) throw new Error("run requires env.AI_MEMORY_HOME");
 
+  // Tests simulate a person at a normal terminal, not an AI session issuing the
+  // command — scrub CLAUDECODE so push.ts's human-operator guard doesn't fire
+  // for every test. A dedicated test in audit.test.ts re-adds it to prove the guard works.
+  const spawnEnv: Record<string, string | undefined> = { ...process.env, AI_MEMORY_HOME: home, AI_MEMORY_KEY: KEY, ...env };
+  delete spawnEnv.CLAUDECODE;
+  if (env.CLAUDECODE !== undefined) spawnEnv.CLAUDECODE = env.CLAUDECODE;
+
   const result = Bun.spawnSync({
     cmd: ["bun", join(import.meta.dir, "..", "scripts", script), ...args],
     stdin: "ignore",
     stdout: "pipe",
     stderr: "pipe",
-    env: { ...process.env, AI_MEMORY_HOME: home, AI_MEMORY_KEY: KEY, ...env },
+    env: spawnEnv,
   });
   const decode = (value: unknown): string =>
     value instanceof Uint8Array ? new TextDecoder().decode(value) : "";

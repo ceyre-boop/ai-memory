@@ -47,6 +47,26 @@
         "conversations": 116,
         "messages": 2418
       }
+    },
+    {
+      "target": "/Volumes/AIMEMORY/ai-memory",
+      "at": "2026-09-14T21:01:34.602Z",
+      "counts": {
+        "files": 54614,
+        "chunks": 905207,
+        "conversations": 116,
+        "messages": 2418
+      }
+    },
+    {
+      "target": "/Volumes/AIMEMORY/ai-memory",
+      "at": "2026-09-14T21:02:07.643Z",
+      "counts": {
+        "files": 54614,
+        "chunks": 905207,
+        "conversations": 116,
+        "messages": 2418
+      }
     }
   ]
 }
