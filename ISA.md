@@ -5,10 +5,10 @@ project: ai-memory
 effort: deep
 effort_source: classifier
 phase: complete
-progress: 176/176
+progress: 177/177
 mode: interactive
 started: 2026-09-13T23:49:58Z
-updated: 2026-09-14T01:30:00Z
+updated: 2026-09-14T02:00:00Z
 ---
 
 ## Problem
@@ -261,6 +261,7 @@ CONSTRAINTS.md is committed first; `bun scripts/ingest.ts <archive>` ingests Cha
 - [x] ISC-173: Zero hits → "no matches in the store — nothing sent to the model" and no call.
 - [x] ISC-174: Anti: outbound network code exists only in `scripts/lib/ask.ts` (test walks scripts/).
 - [x] ISC-175: Default retrieval source is the conversations table; `--source files|all` widens it.
+- [x] ISC-177: `AI_MEMORY_PROVIDER` defaults to `claude-cli`: the signed-in Claude Code CLI runs the call on the user subscription with `--tools "" --strict-mcp-config --setting-sources "" --no-session-persistence`, env scrubbed of CLAUDECODE/ANTHROPIC_* (fake-binary test checks every flag); `api` uses the Messages API.
 - [x] ISC-176: Stopwords are dropped from FTS OR-queries when other terms remain, so paraphrased questions rank on content words.
 
 ## Test Strategy
@@ -320,6 +321,8 @@ CONSTRAINTS.md is committed first; `bun scripts/ingest.ts <archive>` ingests Cha
 - 2026-09-14T01:30Z — Live verification blocked by the account: Messages API returns "You have reached your specified API usage limits… regain access on 2026-10-01". Both --dry runs shown; both live runs print that error cleanly with exit 1.
 - 2026-09-14T01:30Z — Test deadlock found and fixed: spawning the CLI synchronously while the mock model endpoint lives in the test process blocks the event loop; the CLI must be spawned async.
 
+- 2026-09-14T02:00Z — User: no API spend; bill the Max subscription. Added the claude-cli provider (default) mirroring PAI Inference.ts. First live JARVIS turn claimed access to mail/calendar/brokerage — the CLI had attached the user MCP servers; `--strict-mcp-config` now drops them in both ask.ts and the display server.
+
 ## Changelog
 
 - 2026-09-13T23:49Z — conjectured: `corpus/` must itself be encrypted to satisfy the hard rule. refuted_by: FirstPrinciples challenge — the rule forbids the *system* writing plaintext there; documents can live inside the encrypted DB. learned: name the corpus correctly and the second encryption layer disappears. criterion_now: ISC-44 (no script writes under corpus/) and ISC-129 (push excludes corpus/).
@@ -331,6 +334,8 @@ CONSTRAINTS.md is committed first; `bun scripts/ingest.ts <archive>` ingests Cha
 - 2026-09-14T01:30Z — conjectured: OR-ing every whitespace term is enough for FTS5 retrieval. refuted_by: "When should I stop trading a signal that used to work?" ranked chunks on "to", "I", "that" and returned unrelated transcripts. learned: function words carry no rank signal and must be dropped when content words remain; the conversations table, not swept files, is the record. criterion_now: ISC-175, ISC-176.
 
 ## Verification
+
+- ISC-177 + live: `bun scripts/ask.ts "When should I stop trading a signal that used to work?"` → expanded with 3 variants, answered "Not in your record." with an honest summary of the two nearest threads and cited sources, 9.2 s via `opus via claude CLI (subscription)`; `"What colour did I paint the kitchen?"` → "Not in your record." citing the Owosso house thread as the only kitchen mentions, 6.1 s. `bun test` → 70 pass.
 
 - ISC-166..176: `bun test` → `69 pass, 0 fail` across 7 files; `bun scripts/ask.ts "When should I stop trading a signal that used to work?" --dry --k 6` → 6 conversation snippets in 26 ms, top hits from "Predicting market moves with statistical analysis and AI" (2026-05-31, 2026-05-12); `"What colour did I paint the kitchen?" --dry` → kitchen mentions from the Owosso house thread only; live runs → `✗ model call failed (400): You have reached your specified API usage limits…` exit 1.
 

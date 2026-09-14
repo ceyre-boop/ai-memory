@@ -27,7 +27,7 @@ written anywhere by these scripts. There is no recovery if you lose it.
 | `bun scripts/forget.ts <conversation-id> \| --provider X [--dry]` | Delete conversations and their search entries. |
 | `bun scripts/status.ts` | Encryption state, row counts, recorded pushes. |
 | `bun scripts/push.ts /Volumes/CHIP [--dry] [--pull]` | Copy the store to media, then reopen and count it there. Refuses plaintext. |
-| `bun scripts/ask.ts "question" [--k 8] [--dry] [--no-expand]` | Answer from your own record: top-k snippets via search, sent with the question to the model in `.env`; sources listed; says "Not in your record." otherwise. `--dry` sends nothing. |
+| `bun scripts/ask.ts "question" [--k 8] [--dry] [--no-expand]` | Answer from your own record: top-k snippets via search, sent with the question to the model (the `claude` CLI on your subscription by default; `AI_MEMORY_PROVIDER=api` uses `ANTHROPIC_API_KEY` from `.env`); sources listed; says "Not in your record." otherwise. `--dry` sends nothing. |
 | `bun scripts/serve.ts [--port 3131]` | Local display: `ui/` plus a read-only JSON API over the store on 127.0.0.1. |
 
 `--dry` prints the plan and writes nothing. Every bulk or destructive command has it.

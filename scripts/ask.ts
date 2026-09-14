@@ -21,6 +21,8 @@ usage: bun scripts/ask.ts "question" [--k 8] [--dry] [--no-expand] [--source all
   --dry        print the retrieved snippets and the assembled prompt; call no API (expansion skipped)
   --no-expand  search the question as typed; default asks a small model for 3 keyword variants first
   --source     conv (default: your conversations) | files (collected files) | all
+
+  Provider: the claude CLI on your subscription (default) or AI_MEMORY_PROVIDER=api with ANTHROPIC_API_KEY in .env.
 `;
 
 function when(ms: number | null | undefined): string {
@@ -53,7 +55,9 @@ async function main() {
 
   const cfg = modelConfig();
   if (!DRY && !cfg.configured) {
-    throw new StoreError("no model configured — put ANTHROPIC_API_KEY in .env (or use --dry to see what would be sent)");
+    throw new StoreError(cfg.provider === "api"
+      ? "no model configured — put ANTHROPIC_API_KEY in .env, or unset AI_MEMORY_PROVIDER to use the claude CLI (or --dry)"
+      : "claude CLI not found — install Claude Code and sign in, or set AI_MEMORY_PROVIDER=api with ANTHROPIC_API_KEY (or --dry)");
   }
 
   // 1. retrieval — one search path (query.ts), optionally widened by model-suggested keywords
@@ -88,7 +92,7 @@ async function main() {
     hits.forEach((h, i) => console.log(`\n[${i + 1}] ${describeHit(h)} · score ${h.score.toFixed(2)}\n${h.snippet}`));
     console.log("\n── system prompt ──\n" + SYSTEM_PROMPT);
     console.log("\n── user message ──\n" + buildUserMessage(question, hits));
-    console.log(`\nDRY RUN — nothing sent (model would be ${cfg.model})`);
+    console.log(`\nDRY RUN — nothing sent (would go to ${cfg.model} via ${cfg.label})`);
     return;
   }
 
@@ -110,7 +114,7 @@ async function main() {
     console.log("Sources: none cited — snippets sent (uncited):");
     hits.forEach((h, i) => console.log(sourceLine(i + 1, h)));
   }
-  console.log(`\n— ${r.model} · ${fmtInt(r.snippets_sent)} snippets sent · ${askMs} ms` +
+  console.log(`\n— ${r.model} via ${cfg.label} · ${fmtInt(r.snippets_sent)} snippets sent · ${askMs} ms` +
     (r.usage ? ` · ${fmtInt(r.usage.input_tokens ?? 0)} in / ${fmtInt(r.usage.output_tokens ?? 0)} out tokens` : ""));
 }
 

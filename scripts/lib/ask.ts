@@ -17,19 +17,41 @@ export function loadDotEnv(file = join(REPO, ".env")) {
   }
 }
 
+export type Provider = "claude-cli" | "api";
 export const DEFAULT_MODEL = "claude-opus-5";
 export const DEFAULT_EXPAND_MODEL = "claude-haiku-4-5";
+// The claude CLI takes aliases; these bill to the signed-in subscription.
+export const DEFAULT_CLI_MODEL = "opus";
+export const DEFAULT_CLI_EXPAND_MODEL = "haiku";
 export const DEFAULT_URL = "https://api.anthropic.com/v1/messages";
 
+function cliBinary(): string | null {
+  const explicit = process.env.AI_MEMORY_CLAUDE_BIN;
+  if (explicit) return existsSync(explicit) ? explicit : null;
+  const r = Bun.spawnSync(["sh", "-c", "command -v claude"], { stdout: "pipe", stderr: "ignore" });
+  const p = r.stdout.toString().trim();
+  return r.exitCode === 0 && p ? p : null;
+}
+
+/**
+ * Two ways out: `claude-cli` (default) shells out to the signed-in Claude Code
+ * CLI, so the call bills to the user's own subscription; `api` uses the
+ * Messages API with ANTHROPIC_API_KEY. Set AI_MEMORY_PROVIDER to choose.
+ */
 export function modelConfig() {
   loadDotEnv();
+  const provider = ((process.env.AI_MEMORY_PROVIDER || "claude-cli").toLowerCase() === "api" ? "api" : "claude-cli") as Provider;
   const key = process.env.ANTHROPIC_API_KEY;
+  const bin = provider === "claude-cli" ? cliBinary() : null;
   return {
-    configured: !!key,
+    provider,
+    configured: provider === "api" ? !!key : !!bin,
     key,
-    model: process.env.AI_MEMORY_MODEL || DEFAULT_MODEL,
-    expandModel: process.env.AI_MEMORY_EXPAND_MODEL || DEFAULT_EXPAND_MODEL,
+    bin,
+    model: process.env.AI_MEMORY_MODEL || (provider === "api" ? DEFAULT_MODEL : DEFAULT_CLI_MODEL),
+    expandModel: process.env.AI_MEMORY_EXPAND_MODEL || (provider === "api" ? DEFAULT_EXPAND_MODEL : DEFAULT_CLI_EXPAND_MODEL),
     url: process.env.AI_MEMORY_MODEL_URL || DEFAULT_URL,
+    label: provider === "api" ? "Messages API" : "claude CLI (subscription)",
   };
 }
 
@@ -103,9 +125,35 @@ export function mergeHits(lists: Hit[][], limit: number): Hit[] {
   return [...seen.values()].sort((a, b) => a.score - b.score).slice(0, limit);
 }
 
-async function messages(body: Record<string, unknown>): Promise<any> {
+/** Run one prompt through the claude CLI. No tools, no settings, no session file; stdin carries the user message. */
+async function viaCli(cfg: ReturnType<typeof modelConfig>, body: { model: string; system: string; messages: { role: string; content: string }[] }): Promise<any> {
+  const env: Record<string, string> = {};
+  for (const [k, v] of Object.entries(process.env)) if (v !== undefined) env[k] = v;
+  delete env.CLAUDECODE;            // allow running from inside a Claude Code session
+  delete env.ANTHROPIC_API_KEY;     // these outrank OAuth in the CLI's precedence chain and would
+  delete env.ANTHROPIC_AUTH_TOKEN;  // silently move the call onto API billing
+  // --tools "" drops built-in tools; --strict-mcp-config (with no --mcp-config) drops the
+  // user's MCP servers too, so the model can neither act on accounts nor claim it can.
+  const args = ["--print", "--model", body.model, "--tools", "", "--strict-mcp-config", "--output-format", "text",
+    "--setting-sources", "", "--no-session-persistence", "--system-prompt", body.system];
+  const proc = Bun.spawn([cfg.bin!, ...args], { env, stdin: "pipe", stdout: "pipe", stderr: "pipe" });
+  proc.stdin.write(body.messages.map((m) => m.content).join("\n\n"));
+  proc.stdin.end();
+  const timer = setTimeout(() => proc.kill(), 240_000);
+  const [out, err, code] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited]);
+  clearTimeout(timer);
+  if (code !== 0) throw new Error(`claude CLI failed (exit ${code}): ${(err || out).trim().split("\n").slice(-3).join(" ")}`);
+  return { model: body.model, stop_reason: "end_turn", content: [{ type: "text", text: out.trim() }] };
+}
+
+async function messages(body: { model: string; max_tokens: number; system: string; messages: { role: string; content: string }[] }): Promise<any> {
   const cfg = modelConfig();
-  if (!cfg.configured) throw new Error("no model configured — set ANTHROPIC_API_KEY in .env to enable ask");
+  if (!cfg.configured) {
+    throw new Error(cfg.provider === "api"
+      ? "no model configured — set ANTHROPIC_API_KEY in .env (AI_MEMORY_PROVIDER=api)"
+      : "claude CLI not found — install Claude Code and sign in, or set AI_MEMORY_PROVIDER=api with ANTHROPIC_API_KEY");
+  }
+  if (cfg.provider === "claude-cli") return viaCli(cfg, body);
   const res = await fetch(cfg.url, {
     method: "POST",
     headers: { "content-type": "application/json", "x-api-key": cfg.key!, "anthropic-version": "2023-06-01" },
