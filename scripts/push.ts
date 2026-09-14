@@ -206,8 +206,9 @@ function printCapacity(size: number, free: number): void {
   console.log(`store ${formatGigabytes(size)} · free ${formatGigabytes(free)}`);
 }
 
-function printDryPlan(size: number, free: number, source: string = ROOT): void {
+function printDryPlan(size: number, free: number, source: string = ROOT, already = 0): void {
   printCapacity(size, free);
+  if (already) console.log(`already on target ${formatGigabytes(already)} · needs ${formatGigabytes(Math.max(0, size - already))} more`);
   console.log("would copy top-level entries:");
   for (const entry of COPY_ENTRIES) if (existsSync(join(source, entry))) console.log(`  ${entry}`);
   console.log(`never copied: ${NEVER_COPIED}`);
@@ -255,11 +256,16 @@ async function push(target: string, destination: string, dry: boolean): Promise<
   const size = storeBytes();
   const free = targetFreeBytes(target);
   if (dry) {
-    printDryPlan(size, free);
+    printDryPlan(size, free, ROOT, existsSync(destination) ? storeBytes(destination) : 0);
     return;
   }
   requireMountedWritableTarget(target);
-  if (size > free) throw new StoreError("not enough space on target");
+  // An update replaces what is already there: only the growth has to fit.
+  const already = existsSync(destination) ? storeBytes(destination) : 0;
+  const needed = Math.max(0, size - already);
+  if (needed > free) {
+    throw new StoreError(`not enough space on target: need ${formatGigabytes(needed)} more, ${formatGigabytes(free)} free`);
+  }
 
   const key = getKey(process.argv.slice(2));
   const sourceCounts = checkpointAndCount(key);
