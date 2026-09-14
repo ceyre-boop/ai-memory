@@ -27,6 +27,16 @@
         "conversations": 116,
         "messages": 2418
       }
+    },
+    {
+      "target": "/Volumes/NO NAME/ai-memory",
+      "at": "2026-09-14T05:09:49.881Z",
+      "counts": {
+        "files": 54614,
+        "chunks": 905207,
+        "conversations": 116,
+        "messages": 2418
+      }
     }
   ]
 }

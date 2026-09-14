@@ -294,7 +294,10 @@ export function counts(db: Database, strict = false): Counts {
   };
   return {
     files: one("SELECT count(*) c FROM files"),
-    chunks: one("SELECT count(*) c FROM chunks"),
+    // chunks_docsize is FTS5's one-row-per-document shadow table: same count as
+    // `chunks`, but kilobytes instead of a full scan of ~2 GB of content — the
+    // difference between seconds and ten minutes when the store is on an SD card.
+    chunks: one("SELECT count(*) c FROM chunks_docsize"),
     conversations: one("SELECT count(*) c FROM conversations"),
     messages: one("SELECT count(*) c FROM messages"),
   };

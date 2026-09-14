@@ -42,11 +42,13 @@ const CLUSTER: Record<string, string> = { chatgpt: "ChatGPT", claude: "Claude", 
 
 export function buildApi(db: Database) {
   const t0 = Date.now();
-  // count(*) over a 900k-row FTS table costs seconds; the store is read-only
-  // for this process, so cache the counts for 60 s.
+  // The store is read-only for this process, so counts only change when
+  // another process writes; refresh every 10 min. (counts() itself is cheap
+  // now — it reads FTS5's docsize table, not the content — but on a slow
+  // card even cheap reads add up under a 3 s telemetry poll.)
   let cached: { at: number; c: ReturnType<typeof counts> } | null = null;
   const total = () => {
-    if (!cached || Date.now() - cached.at > 60_000) cached = { at: Date.now(), c: counts(db) };
+    if (!cached || Date.now() - cached.at > 600_000) cached = { at: Date.now(), c: counts(db) };
     return cached.c;
   };
 
