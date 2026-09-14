@@ -38,7 +38,8 @@ context and rent the model. This is memory infrastructure, nothing more.
   `/api/ask`) sends your question plus the matching snippets to the model provider you configure
   with `ANTHROPIC_API_KEY`. No key → no call, search only. Never the passphrase, never the whole
   store; the response shows how many snippets went out and to which model. That is the only
-  network code in this repository (tests enforce it lives in one file).
+  network code in this repository (tests enforce it lives in one file). As of 2026-09-14 the module
+  exists but is not wired into the server; enabling it is a deliberate step, not a default.
 - Never writes plaintext into `corpus/`. That folder is an inbox you control; the store is the
   encrypted database. `push` never copies `corpus/` to removable media.
 - Never places a plaintext database on removable media. `push` checks the file header and refuses.
