@@ -1,5 +1,11 @@
 # ai-memory
 
+> Pull the drive mid-conversation and it doesn't guess — it says "not in your record." I built an
+> encrypted memory store that ingests your own AI conversation history from ChatGPT, Claude, and
+> Gemini, keeps it fully searchable, and lives entirely on a drive you carry — no account, no cloud,
+> no vendor lock-in. Every other assistant forgets you the moment the session ends; this one
+> remembers everything you've ever told any of them, and only speaks from what's actually there.
+
 **An assistant that remembers everything you've ever told any AI, running entirely off a drive in your pocket.**
 
 Your conversation history with ChatGPT, Claude, and Gemini is legally yours and practically stranded
@@ -21,27 +27,29 @@ above refuses instead of guessing the moment its record is gone — that's the d
 memory and a model that hallucinates when the lookup fails, and it's the whole argument this
 project is making. Recorded live against the real store, served straight off the encrypted SD card:
 
+*(Fictional demo data — "Maple Hollow," "Bellwood State," and every other detail below are made up)*
+
 ```
-▸ What did I tell you about my commute to Flint?
-[AI] Thirty-five minutes by car from Owosso to Flint, assessed as manageable [1]. That came up
-     while house-hunting in Owosso, on the basis that you attend University of Michigan Flint
-     and Mott [2].
-Sources: [1] Finding the perfect house in Owosso · 2026-06-16 · [2] same thread
+▸ What did I tell you about my commute?
+[AI] Twenty-eight minutes by car from Maple Hollow to Bellwood State, assessed as manageable [1].
+     That came up while house-hunting in Maple Hollow, on the basis that you attend Bellwood
+     State and take evening classes at Larkspur Community College [2].
+Sources: [1] Finding the right house in Maple Hollow · 2026-06-16 · [2] same thread
 
                               ── the drive comes out ──
 
 ▸ And what about the neighborhood I liked there?
 [SYSTEM] Memory store went away (drive unplugged?). I can talk, but I cannot remember anything
          for you until it is back.
-[AI] I couldn't say, sir — the memory store is offline at the moment, so I have nothing to draw
-     on beyond what we've already discussed…
+[AI] I couldn't say — the memory store is offline at the moment, so I have nothing to draw on
+     beyond what we've already discussed…
 
                               ── the drive goes back in ──
 
 ▸ And what about the neighborhood I liked there?
-[AI] The record is back, sir — my apologies. The neighborhood in question is Ardelean, on the
-     north side of Owosso: the city's most desirable area with the best resale floor, and the
-     first one to call about [2][4]. Nothing in the record about a neighborhood in Flint itself.
+[AI] The record is back, my apologies. Fernbrook, on the west side of Maple Hollow: the strongest
+     resale floor of anywhere you looked, and you wanted first call on new listings there [1].
+     Nothing in the record about any other neighborhood.
 ```
 
 No retry logic papered over that gap. No fallback to what the model would guess. It didn't know,
