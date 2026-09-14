@@ -1,0 +1,55 @@
+[
+  {
+    "title": "Sourdough starter timing",
+    "create_time": 1718000000.123,
+    "update_time": 1718003600.5,
+    "conversation_id": "c0ffee00-0000-4000-8000-000000000001",
+    "id": "c0ffee00-0000-4000-8000-000000000001",
+    "current_node": "a2b",
+    "mapping": {
+      "root": { "id": "root", "parent": null, "children": ["u1"],
+        "message": { "id": "root", "author": { "role": "system" }, "create_time": null,
+          "content": { "content_type": "text", "parts": [""] }, "metadata": {} } },
+      "u1": { "id": "u1", "parent": "root", "children": ["a1"],
+        "message": { "id": "u1", "author": { "role": "user" }, "create_time": 1718000000.5,
+          "content": { "content_type": "text", "parts": ["How long should I let a sourdough starter ferment before the first bake?"] } } },
+      "a1": { "id": "a1", "parent": "u1", "children": ["u2", "u2b"],
+        "message": { "id": "a1", "author": { "role": "assistant" }, "create_time": 1718000030.0,
+          "content": { "content_type": "text", "parts": ["Typically 5 to 7 days at room temperature until it doubles within 4–6 hours of feeding."] } } },
+      "u2": { "id": "u2", "parent": "a1", "children": ["a2"],
+        "message": { "id": "u2", "author": { "role": "user" }, "create_time": 1718000100.0,
+          "content": { "content_type": "text", "parts": ["What if my kitchen is cold?"] } } },
+      "a2": { "id": "a2", "parent": "u2", "children": [],
+        "message": { "id": "a2", "author": { "role": "assistant" }, "create_time": 1718000130.0,
+          "content": { "content_type": "text", "parts": ["Cold kitchens slow fermentation; expect 10 to 14 days."] } } },
+      "u2b": { "id": "u2b", "parent": "a1", "children": ["a2b"],
+        "message": { "id": "u2b", "author": { "role": "user" }, "create_time": 1718000200.0,
+          "content": { "content_type": "text", "parts": ["What if my kitchen is cold, around 16 degrees Celsius?"] } } },
+      "a2b": { "id": "a2b", "parent": "u2b", "children": [],
+        "message": { "id": "a2b", "author": { "role": "assistant" }, "create_time": 1718000230.0,
+          "content": { "content_type": "text", "parts": ["At 16 °C plan on 10 to 14 days, or move the jar somewhere warmer like on top of the fridge."] } } }
+    }
+  },
+  {
+    "title": "Regex for ISO dates",
+    "create_time": 1720000000.0,
+    "update_time": 1720000900.0,
+    "conversation_id": "c0ffee00-0000-4000-8000-000000000002",
+    "id": "c0ffee00-0000-4000-8000-000000000002",
+    "current_node": "t1",
+    "mapping": {
+      "root": { "id": "root", "parent": null, "children": ["u1"], "message": null },
+      "u1": { "id": "u1", "parent": "root", "children": ["a1"],
+        "message": { "id": "u1", "author": { "role": "user" }, "create_time": 1720000000.0,
+          "content": { "content_type": "multimodal_text", "parts": [
+            { "content_type": "image_asset_pointer", "asset_pointer": "file-service://file-fixture-image-001", "width": 800, "height": 600 },
+            "Write a Python regex that matches ISO 8601 dates like the ones in this screenshot." ] } } },
+      "a1": { "id": "a1", "parent": "u1", "children": ["t1"],
+        "message": { "id": "a1", "author": { "role": "assistant" }, "create_time": null,
+          "content": { "content_type": "code", "language": "python", "text": "import re\nISO_DATE = re.compile(r\"^\\d{4}-\\d{2}-\\d{2}$\")" } } },
+      "t1": { "id": "t1", "parent": "a1", "children": [],
+        "message": { "id": "t1", "author": { "role": "tool" }, "create_time": 1720000060.0,
+          "content": { "content_type": "execution_output", "text": "re.compile('^\\\\d{4}-\\\\d{2}-\\\\d{2}$')" } } }
+    }
+  }
+]

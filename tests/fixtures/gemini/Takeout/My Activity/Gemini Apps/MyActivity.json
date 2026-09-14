@@ -1,0 +1,33 @@
+[
+  {
+    "header": "Gemini Apps",
+    "title": "Prompted Now a haiku about the first frost",
+    "time": "2026-03-14T14:12:00.000Z",
+    "products": ["Gemini Apps"],
+    "activityControls": ["Gemini Apps Activity"]
+  },
+  {
+    "header": "Gemini Apps",
+    "title": "Prompted Draft a haiku about autumn",
+    "time": "2026-03-14T14:00:00.000Z",
+    "products": ["Gemini Apps"],
+    "activityControls": ["Gemini Apps Activity"],
+    "safeHtmlItem": [ { "html": "<p>Maple leaves let go&#8212;<br>the river carries October<br>past the empty dock.</p>" } ]
+  },
+  {
+    "header": "Gemini Apps",
+    "title": "Prompted And in Denver specifically?",
+    "time": "2026-03-14T10:05:30.000Z",
+    "products": ["Gemini Apps"],
+    "activityControls": ["Gemini Apps Activity"],
+    "safeHtmlItem": [ { "html": "<p>Denver sits at about 1,600 m, so water boils near <b>95&deg;C</b> rather than 100&deg;C.</p>" } ]
+  },
+  {
+    "header": "Gemini Apps",
+    "title": "Prompted What is the boiling point of water at altitude?",
+    "time": "2026-03-14T10:00:00.000Z",
+    "products": ["Gemini Apps"],
+    "activityControls": ["Gemini Apps Activity"],
+    "safeHtmlItem": [ { "html": "<p>It drops as pressure falls:</p><ul><li>Sea level: 100&deg;C</li><li>2,000 m: about 93&deg;C</li></ul>" } ]
+  }
+]

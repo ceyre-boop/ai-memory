@@ -1,0 +1,94 @@
+[
+  {
+    "uuid": "0192aaaa-0000-7000-8000-000000000001",
+    "name": "Trip planning for Lisbon",
+    "summary": "",
+    "created_at": "2026-05-02T09:15:00.000000Z",
+    "updated_at": "2026-05-02T09:22:10.000000Z",
+    "account": { "uuid": "acct-fixture" },
+    "chat_messages": [
+      {
+        "uuid": "m-0001",
+        "text": "Here is my flight confirmation. Plan two days in Lisbon around it.",
+        "content": [ { "type": "text", "text": "Here is my flight confirmation. Plan two days in Lisbon around it." } ],
+        "sender": "human",
+        "created_at": "2026-05-02T09:15:01.000000Z",
+        "updated_at": "2026-05-02T09:15:01.000000Z",
+        "attachments": [
+          { "file_name": "confirmation.txt", "file_size": 412, "file_type": "text/plain",
+            "extracted_content": "Flight LIS arrival 09:40 Saturday, departure 21:05 Sunday. Hotel near Alfama." }
+        ],
+        "files": [],
+        "parent_message_uuid": "00000000-0000-4000-8000-000000000000"
+      },
+      {
+        "uuid": "m-0002",
+        "text": "",
+        "content": [
+          { "type": "thinking", "thinking": "The traveller lands Saturday morning; the pastel de nata line at Belém is shortest before 10." },
+          { "type": "text", "text": "Saturday: drop bags in Alfama, tram 28 to Graça, sunset at Miradouro da Senhora do Monte. Sunday: Belém early, LX Factory, then the airport." }
+        ],
+        "sender": "assistant",
+        "created_at": "2026-05-02T09:15:40.000000Z",
+        "updated_at": "2026-05-02T09:15:40.000000Z",
+        "attachments": [],
+        "files": [],
+        "parent_message_uuid": "m-0001"
+      },
+      {
+        "uuid": "m-0003",
+        "text": "Is the tram 28 route on this map?",
+        "content": [ { "type": "text", "text": "Is the tram 28 route on this map?" } ],
+        "sender": "human",
+        "created_at": "2026-05-02T09:20:00.000000Z",
+        "updated_at": "2026-05-02T09:20:00.000000Z",
+        "attachments": [],
+        "files": [ { "file_uuid": "f-0001", "file_name": "lisbon-map.png" } ],
+        "parent_message_uuid": "m-0002"
+      },
+      {
+        "uuid": "m-0004",
+        "text": "",
+        "content": [
+          { "type": "tool_use", "name": "web_search", "input": { "query": "tram 28 route map" } },
+          { "type": "tool_result", "name": "web_search", "content": [ { "type": "text", "text": "Tram 28E runs Martim Moniz to Campo de Ourique." } ] },
+          { "type": "text", "text": "Yes. Tram 28E runs from Martim Moniz through Graça and Alfama to Campo de Ourique; the map shows the Alfama section." }
+        ],
+        "sender": "assistant",
+        "created_at": "2026-05-02T09:22:10.000000Z",
+        "updated_at": "2026-05-02T09:22:10.000000Z",
+        "attachments": [],
+        "files": [],
+        "parent_message_uuid": "m-0003"
+      }
+    ]
+  },
+  {
+    "uuid": "0192aaaa-0000-7000-8000-000000000002",
+    "name": "Debug a bun test",
+    "summary": "",
+    "created_at": "2026-05-09T18:00:00.000000Z",
+    "updated_at": "2026-05-09T18:01:00.000000Z",
+    "account": { "uuid": "acct-fixture" },
+    "chat_messages": [
+      {
+        "uuid": "m-1001",
+        "text": "My bun test says 'expected 2 to be 3' but the function returns 3 in the REPL. Why?",
+        "sender": "human",
+        "created_at": "2026-05-09T18:00:00.000000Z",
+        "updated_at": "2026-05-09T18:00:00.000000Z",
+        "attachments": [],
+        "files": []
+      },
+      {
+        "uuid": "m-1002",
+        "text": "The test imports a stale build. Delete the dist folder and run bun test again.",
+        "sender": "assistant",
+        "created_at": "2026-05-09T18:01:00.000000Z",
+        "updated_at": "2026-05-09T18:01:00.000000Z",
+        "attachments": [],
+        "files": []
+      }
+    ]
+  }
+]
