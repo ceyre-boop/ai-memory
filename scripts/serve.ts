@@ -155,7 +155,7 @@ if (import.meta.main) {
     const db = openStore({ readonly: true });
     const api = buildApi(db);
     const server = Bun.serve({ hostname: "127.0.0.1", port, fetch: makeFetch(api) });
-    const c = counts(db);
+    const c = api.telemetry().counts; // warms the count cache before the first page load
     console.log(`▸ ai-memory display on http://127.0.0.1:${server.port}  (loopback only, read-only)`);
     console.log(`  ${c.conversations.toLocaleString()} conversations · ${c.messages.toLocaleString()} messages · ${c.files.toLocaleString()} files · ${c.chunks.toLocaleString()} chunks`);
     process.on("SIGINT", () => { server.stop(); db.close(); process.exit(0); });
