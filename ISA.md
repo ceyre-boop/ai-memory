@@ -5,10 +5,10 @@ project: ai-memory
 effort: deep
 effort_source: classifier
 phase: complete
-progress: 165/165
+progress: 176/176
 mode: interactive
 started: 2026-09-13T23:49:58Z
-updated: 2026-09-14T00:55:00Z
+updated: 2026-09-14T01:30:00Z
 ---
 
 ## Problem
@@ -250,6 +250,19 @@ CONSTRAINTS.md is committed first; `bun scripts/ingest.ts <archive>` ingests Cha
 - [x] ISC-164: `counts(db, true)` throws on a missing table; push/pull verification uses it, so a zero is never blessed.
 - [x] ISC-165: Child processes (rsync, du, df, unzip) run with an env scrubbed of KEY/TOKEN/SECRET/PASS variables; `recursive_triggers` is ON so cascade deletes keep messages_fts in sync.
 
+### Ask layer (promoted from wip/, 2026-09-14)
+- [x] ISC-166: `scripts/ask.ts "question"` retrieves through `query.ts` `search()` only; no second search implementation exists (grep: SQL for messages_fts/chunks appears in query.ts and serve.ts only).
+- [x] ISC-167: The model key is read from `.env` via `loadDotEnv()` and never appears in stdout/stderr (test asserts).
+- [x] ISC-168: The store passphrase resolves from `--key-file`, `AI_MEMORY_KEY`, then `~/.config/ai-memory/key`.
+- [x] ISC-169: The system prompt forbids outside knowledge and requires the exact reply "Not in your record." when the snippets do not answer.
+- [x] ISC-170: Every answer prints `Sources:` with provider · thread title · date per cited `[n]`; uncited runs list what was sent.
+- [x] ISC-171: `--k N` bounds snippets (default 8); `--dry` prints snippets + the assembled prompt and makes no API call (test counts mock calls).
+- [x] ISC-172: Expansion is on by default: one small-model call yields 3 keyword variants; results are unioned and deduped by message id / path+snippet; `--no-expand` disables; malformed replies fall back to the plain question with a note.
+- [x] ISC-173: Zero hits → "no matches in the store — nothing sent to the model" and no call.
+- [x] ISC-174: Anti: outbound network code exists only in `scripts/lib/ask.ts` (test walks scripts/).
+- [x] ISC-175: Default retrieval source is the conversations table; `--source files|all` widens it.
+- [x] ISC-176: Stopwords are dropped from FTS OR-queries when other terms remain, so paraphrased questions rank on content words.
+
 ## Test Strategy
 
 | isc | type | check | threshold | tool |
@@ -303,6 +316,10 @@ CONSTRAINTS.md is committed first; `bun scripts/ingest.ts <archive>` ingests Cha
 - 2026-09-14T00:50Z — Cato verdict: concerns, 2 critical (push copied .env/*.key to media; Gemini gap change duplicated threads). Both fixed with regression tests (tests/audit.test.ts). Of the warnings/infos: 8 fixed (dry probe, unverified pull, counts-as-zero, unreachable ChatGPT nodes, empty Claude content[], child env, recursive triggers, ISC-98/141 wording, CONSTRAINTS ask paragraph), 1 accepted (passphrase in SQL text is inherent to SQLCipher PRAGMA key), 1 reduced (no-timestamp entries now a separate note).
 - 2026-09-14T00:50Z — The pull test caught a bug the audit did not: the new secret scan, run on pull, would have deleted the local .env. Scan is media-only now (ISC-158).
 
+- 2026-09-14T01:30Z — Ask layer promoted: CONSTRAINTS updated first (own commit), then scripts/lib/ask.ts + scripts/ask.ts, query.ts exporting `search()`, 9 new tests. Default source is conversations: with `--source all` the swept home-directory files (PAI transcripts, tool-call logs) buried every conversation hit.
+- 2026-09-14T01:30Z — Live verification blocked by the account: Messages API returns "You have reached your specified API usage limits… regain access on 2026-10-01". Both --dry runs shown; both live runs print that error cleanly with exit 1.
+- 2026-09-14T01:30Z — Test deadlock found and fixed: spawning the CLI synchronously while the mock model endpoint lives in the test process blocks the event loop; the CLI must be spawned async.
+
 ## Changelog
 
 - 2026-09-13T23:49Z — conjectured: `corpus/` must itself be encrypted to satisfy the hard rule. refuted_by: FirstPrinciples challenge — the rule forbids the *system* writing plaintext there; documents can live inside the encrypted DB. learned: name the corpus correctly and the second encryption layer disappears. criterion_now: ISC-44 (no script writes under corpus/) and ISC-129 (push excludes corpus/).
@@ -311,7 +328,11 @@ CONSTRAINTS.md is committed first; `bun scripts/ingest.ts <archive>` ingests Cha
 
 - 2026-09-14T00:50Z — conjectured: a blocklist of excluded paths keeps secrets off removable media. refuted_by: Cato — .env and *.key were not in the list; any new secret file would ride along by omission. learned: the safe shape is an allowlist of what ships plus a scan of the target, and the scan must never touch the primary. criterion_now: ISC-157, ISC-158.
 
+- 2026-09-14T01:30Z — conjectured: OR-ing every whitespace term is enough for FTS5 retrieval. refuted_by: "When should I stop trading a signal that used to work?" ranked chunks on "to", "I", "that" and returned unrelated transcripts. learned: function words carry no rank signal and must be dropped when content words remain; the conversations table, not swept files, is the record. criterion_now: ISC-175, ISC-176.
+
 ## Verification
+
+- ISC-166..176: `bun test` → `69 pass, 0 fail` across 7 files; `bun scripts/ask.ts "When should I stop trading a signal that used to work?" --dry --k 6` → 6 conversation snippets in 26 ms, top hits from "Predicting market moves with statistical analysis and AI" (2026-05-31, 2026-05-12); `"What colour did I paint the kitchen?" --dry` → kitchen mentions from the Owosso house thread only; live runs → `✗ model call failed (400): You have reached your specified API usage limits…` exit 1.
 
 - ISC-157..165: `bun test` → `60 pass, 0 fail` across 6 files including tests/audit.test.ts; manual `push` then `--pull` round trip on a temp target prints "✓ pulled and verified: files=0 chunks=0 conversations=2 messages=6".
 

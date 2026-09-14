@@ -1,0 +1,117 @@
+#!/usr/bin/env bun
+// Ask a question of your own record. Retrieves the top-k snippets through
+// query.ts `search()` (the single retrieval path), sends question + snippets
+// to the configured model, prints the answer and the sources it drew from.
+//
+// Usage: bun scripts/ask.ts "question" [--k 8] [--dry] [--no-expand]
+//        [--source conv|files|all] [--key-file <path>]
+//
+// CONSTRAINTS.md → "ask": the only outbound call in the repository. --dry
+// shows exactly what would be sent and sends nothing (no expansion either).
+import { openStore, fail, StoreError } from "./lib/db";
+import { parseArgs, usage, fmtInt } from "./lib/cli";
+import { search, type Hit, type Source } from "./query";
+import { ask, expandQuestion, mergeHits, buildUserMessage, describeHit, citedIndices, modelConfig, SYSTEM_PROMPT } from "./lib/ask";
+
+const USAGE = `
+usage: bun scripts/ask.ts "question" [--k 8] [--dry] [--no-expand] [--source all|conv|files] [--key-file <path>]
+
+  Answers only from the top-k snippets of your own record; says "Not in your record." otherwise.
+  --k N        snippets to send (default 8)
+  --dry        print the retrieved snippets and the assembled prompt; call no API (expansion skipped)
+  --no-expand  search the question as typed; default asks a small model for 3 keyword variants first
+  --source     conv (default: your conversations) | files (collected files) | all
+`;
+
+function when(ms: number | null | undefined): string {
+  return ms ? new Date(ms).toISOString().slice(0, 10) : "undated";
+}
+
+function sourceLine(i: number, h: Hit): string {
+  return h.kind === "conversation"
+    ? `  [${i}] ${h.provider} · ${h.title ?? "(untitled)"} · ${when(h.created_at)}`
+    : `  [${i}] file · ${h.path}`;
+}
+
+async function main() {
+  let args;
+  try {
+    args = parseArgs(process.argv.slice(2), ["dry", "no-expand", "help"], ["k", "source"]);
+  } catch (e) {
+    usage(`${(e as Error).message}\n${USAGE}`);
+  }
+  if (args.flags.has("help") || args.positional.length !== 1 || !args.positional[0].trim()) usage(USAGE);
+  const question = args.positional[0].trim();
+  const k = Number(args.opts.get("k") ?? 8);
+  if (!(Number.isInteger(k) && k > 0 && k <= 50)) usage("--k must be an integer from 1 to 50");
+  // Default to the conversations table: that is the record the question is
+  // about. Swept files (--source files|all) are noisier and bury it.
+  const source = (args.opts.get("source") ?? "conv") as Source;
+  if (!["all", "conv", "files"].includes(source)) usage("--source must be all, conv, or files");
+  const DRY = args.flags.has("dry");
+  const EXPAND = !args.flags.has("no-expand") && !DRY;
+
+  const cfg = modelConfig();
+  if (!DRY && !cfg.configured) {
+    throw new StoreError("no model configured — put ANTHROPIC_API_KEY in .env (or use --dry to see what would be sent)");
+  }
+
+  // 1. retrieval — one search path (query.ts), optionally widened by model-suggested keywords
+  const db = openStore({ readonly: true });
+  let terms = [question];
+  let expansionNote = DRY ? "expansion skipped under --dry" : "";
+  if (EXPAND) {
+    try {
+      const variants = await expandQuestion(question);
+      if (variants.length) { terms = [question, ...variants]; expansionNote = `expanded with: ${variants.map((v) => `"${v}"`).join(", ")}`; }
+      else expansionNote = "expansion returned nothing usable; searched the question as typed";
+    } catch (e) {
+      expansionNote = `expansion failed (${(e as Error).message}); searched the question as typed`;
+    }
+  }
+  const t0 = Date.now();
+  const hits = mergeHits(terms.map((t) => search(db, t, { limit: k, source }) as Hit[]), k);
+  db.close();
+  const retrieveMs = Date.now() - t0;
+
+  console.log(`▸ ${question}`);
+  console.log(`  ${fmtInt(hits.length)} snippets retrieved in ${retrieveMs} ms${expansionNote ? ` · ${expansionNote}` : ""}`);
+
+  if (!hits.length) {
+    console.log("\nno matches in the store — nothing sent to the model");
+    return;
+  }
+
+  // 2. --dry: show exactly what would be sent, send nothing
+  if (DRY) {
+    console.log("\n── retrieved snippets ──");
+    hits.forEach((h, i) => console.log(`\n[${i + 1}] ${describeHit(h)} · score ${h.score.toFixed(2)}\n${h.snippet}`));
+    console.log("\n── system prompt ──\n" + SYSTEM_PROMPT);
+    console.log("\n── user message ──\n" + buildUserMessage(question, hits));
+    console.log(`\nDRY RUN — nothing sent (model would be ${cfg.model})`);
+    return;
+  }
+
+  // 3. ask
+  const t1 = Date.now();
+  let r;
+  try {
+    r = await ask(question, hits);
+  } catch (e) {
+    throw new StoreError(`${(e as Error).message}\n  ${fmtInt(hits.length)} snippets were retrieved; nothing was answered. Re-run with --dry to see them.`);
+  }
+  const askMs = Date.now() - t1;
+  console.log("\n" + r.answer + "\n");
+  const cited = citedIndices(r.answer, hits.length);
+  if (cited.length) {
+    console.log("Sources:");
+    for (const i of cited) console.log(sourceLine(i, hits[i - 1]));
+  } else {
+    console.log("Sources: none cited — snippets sent (uncited):");
+    hits.forEach((h, i) => console.log(sourceLine(i + 1, h)));
+  }
+  console.log(`\n— ${r.model} · ${fmtInt(r.snippets_sent)} snippets sent · ${askMs} ms` +
+    (r.usage ? ` · ${fmtInt(r.usage.input_tokens ?? 0)} in / ${fmtInt(r.usage.output_tokens ?? 0)} out tokens` : ""));
+}
+
+main().catch(fail);

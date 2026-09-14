@@ -4,6 +4,7 @@
 import { Database } from "bun:sqlite";
 import { existsSync, mkdirSync, openSync, readSync, closeSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { homedir } from "node:os";
 
 export const ROOT =
   process.env.AI_MEMORY_HOME ??
@@ -63,6 +64,10 @@ export function getKey(argv: string[] = process.argv): string {
     }
   }
   if (process.env.AI_MEMORY_KEY) return process.env.AI_MEMORY_KEY;
+  // Conventional key file, outside the repo, mode 600. Created by the user (or
+  // by encrypt.ts migrate on first run); never written by any other script.
+  const conventional = join(homedir(), ".config", "ai-memory", "key");
+  if (existsSync(conventional)) return readFileSync(conventional, "utf8").replace(/[\r\n]+$/, "");
   if (process.stdin.isTTY) {
     const r = Bun.spawnSync({
       cmd: [
@@ -78,7 +83,7 @@ export function getKey(argv: string[] = process.argv): string {
     if (k) return k;
   }
   throw new StoreError(
-    "no passphrase: set AI_MEMORY_KEY, pass --key-file <path>, or run interactively",
+    "no passphrase: set AI_MEMORY_KEY, pass --key-file <path>, put it in ~/.config/ai-memory/key, or run interactively",
     2,
   );
 }

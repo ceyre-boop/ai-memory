@@ -13,7 +13,7 @@ brew install sqlcipher            # macOS   (Debian/Ubuntu: apt install libsqlci
 export AI_MEMORY_KEY='a long passphrase you will not forget'
 ```
 
-The passphrase can also come from `--key-file <path>` or an interactive prompt. It is never
+The passphrase can also come from `--key-file <path>`, from `~/.config/ai-memory/key`, or an interactive prompt. It is never
 written anywhere by these scripts. There is no recovery if you lose it.
 
 ## commands
@@ -27,6 +27,7 @@ written anywhere by these scripts. There is no recovery if you lose it.
 | `bun scripts/forget.ts <conversation-id> \| --provider X [--dry]` | Delete conversations and their search entries. |
 | `bun scripts/status.ts` | Encryption state, row counts, recorded pushes. |
 | `bun scripts/push.ts /Volumes/CHIP [--dry] [--pull]` | Copy the store to media, then reopen and count it there. Refuses plaintext. |
+| `bun scripts/ask.ts "question" [--k 8] [--dry] [--no-expand]` | Answer from your own record: top-k snippets via search, sent with the question to the model in `.env`; sources listed; says "Not in your record." otherwise. `--dry` sends nothing. |
 | `bun scripts/serve.ts [--port 3131]` | Local display: `ui/` plus a read-only JSON API over the store on 127.0.0.1. |
 
 `--dry` prints the plan and writes nothing. Every bulk or destructive command has it.
@@ -42,7 +43,7 @@ written anywhere by these scripts. There is no recovery if you lose it.
 
 ```
 CONSTRAINTS.md        the contract
-scripts/              ingest, query, collect, encrypt, forget, status, push, serve
+scripts/              ingest, query, ask, collect, encrypt, forget, status, push, serve
 ui/                   the display served by serve.ts (canvas of conversations, search terminal)
 scripts/lib/          openStore(), key handling, schema, parsers
 tests/                bun test; fixtures/ holds one synthetic export per provider
