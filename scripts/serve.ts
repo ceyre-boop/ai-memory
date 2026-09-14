@@ -45,7 +45,13 @@ const CLUSTER: Record<string, string> = { chatgpt: "ChatGPT", claude: "Claude", 
 
 export function buildApi(db: Database) {
   const t0 = Date.now();
-  const total = () => counts(db);
+  // count(*) over a 900k-row FTS table costs seconds; the store is read-only
+  // for this process, so cache the counts for 60 s.
+  let cached: { at: number; c: ReturnType<typeof counts> } | null = null;
+  const total = () => {
+    if (!cached || Date.now() - cached.at > 60_000) cached = { at: Date.now(), c: counts(db) };
+    return cached.c;
+  };
 
   const nodesRecent = db.prepare(`SELECT c.id, c.provider, c.title, c.created_at, c.updated_at, c.message_count, c.thread_inferred,
       (SELECT substr(body, 1, 160) FROM messages m WHERE m.conversation_id = c.id AND m.role = 'user' ORDER BY seq LIMIT 1) AS first

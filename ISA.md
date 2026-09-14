@@ -222,7 +222,7 @@ CONSTRAINTS.md is committed first; `bun scripts/ingest.ts <archive>` ingests Cha
 - [x] ISC-140: Anti: `tests/` never reference `embeddings/index.db`; every test sets `AI_MEMORY_HOME` to a temp dir.
 - [x] ISC-141: Every script prints usage and exits non-zero when called with no arguments (or `--help`).
 - [x] ISC-142: `package.json` has no `dependencies` or `devDependencies` keys.
-- [x] ISC-143: Anti: grep finds no `/Users/taboost` in tracked files.
+- [x] ISC-143: Anti: grep finds no absolute home-directory path in tracked files.
 - [x] ISC-144: `ingest.ts --dry` on the real Claude export reports 116 conversations.
 - [x] ISC-145: The real Claude export is ingested into the encrypted store and `query.ts` returns a hit from it.
 - [x] ISC-146: `manifest.json` stats include conversations and messages counts; Obsidian `NEXT.md` carries the ai-memory state line.
