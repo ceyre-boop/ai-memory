@@ -4,11 +4,11 @@ slug: 20260913-234958_ai-memory-foundation
 project: ai-memory
 effort: deep
 effort_source: classifier
-phase: execute
-progress: 101/156
+phase: verify
+progress: 156/156
 mode: interactive
 started: 2026-09-13T23:49:58Z
-updated: 2026-09-14T00:25:00Z
+updated: 2026-09-14T00:40:00Z
 ---
 
 ## Problem
@@ -76,36 +76,36 @@ CONSTRAINTS.md is committed first; `bun scripts/ingest.ts <archive>` ingests Cha
 ### Shared library
 - [x] ISC-15: `scripts/lib/db.ts` exports `openStore()`.
 - [x] ISC-16: `openStore()` calls `Database.setCustomSQLite` with a libsqlcipher path before any database opens.
-- [ ] ISC-17: `AI_MEMORY_SQLCIPHER` overrides the cipher library path.
-- [ ] ISC-18: A missing cipher library produces an error message that names the install command and exits non-zero.
+- [x] ISC-17: `AI_MEMORY_SQLCIPHER` overrides the cipher library path.
+- [x] ISC-18: A missing cipher library produces an error message that names the install command and exits non-zero.
 - [x] ISC-19: The passphrase is read from `AI_MEMORY_KEY` when set.
-- [ ] ISC-20: The passphrase is read from the file named by `--key-file` (trailing newline stripped).
+- [x] ISC-20: The passphrase is read from the file named by `--key-file` (trailing newline stripped).
 - [x] ISC-21: With no key source and no TTY, scripts exit code 2 with a message naming the three key sources.
 - [x] ISC-22: A wrong passphrase produces the message "wrong passphrase or not an ai-memory store" and exit non-zero.
 - [x] ISC-23: Anti: no script prints the passphrase (test asserts stdout+stderr of every command exclude it).
 - [x] ISC-24: `conversations` table exists with columns id, provider, source_id, title, created_at, updated_at, message_count, thread_inferred, export_file, export_hash, imported_at.
 - [x] ISC-25: `messages` table exists with columns id, conversation_id, seq, role, created_at, body, parent_id, on_main_path, content_types.
 - [x] ISC-26: `messages_fts` is an FTS5 external-content table kept in sync by insert/delete/update triggers.
-- [ ] ISC-27: `files` and `chunks` tables are unchanged in shape after migration (same column list).
+- [x] ISC-27: `files` and `chunks` tables are unchanged in shape after migration (same column list).
 - [x] ISC-28: Calling `openStore()` twice on the same file raises no error (schema creation idempotent).
 - [x] ISC-29: `AI_MEMORY_HOME` overrides the store root directory.
-- [ ] ISC-30: Anti: no `new Database(` call exists outside `scripts/lib/db.ts`, `scripts/encrypt.ts`, and `tests/`.
+- [x] ISC-30: Anti: no `new Database(` call exists outside `scripts/lib/db.ts`, `scripts/encrypt.ts`, and `tests/`.
 
 ### Encryption at rest
-- [ ] ISC-31: `scripts/encrypt.ts` exists with subcommands `migrate`, `rekey`, `check`.
-- [ ] ISC-32: `encrypt.ts migrate --dry` prints the plan and leaves `embeddings/` byte-identical (mtimes unchanged, no new files).
-- [ ] ISC-33: `migrate` exports via `sqlcipher_export` into a sibling file and compares `files`, `chunks`, `docs` counts before swapping.
-- [ ] ISC-34: After migration the first 16 bytes of `embeddings/index.db` are not `SQLite format 3\0`.
-- [ ] ISC-35: After migration, opening `embeddings/index.db` without a key fails with "file is not a database".
-- [ ] ISC-36: After migration, `openStore()` with the key reports 905,205 chunks and 54,612 files.
-- [ ] ISC-37: `migrate` on an already-encrypted file exits non-zero with "already encrypted".
-- [ ] ISC-38: The plaintext original and its `-wal`/`-shm` sidecars are removed only after ISC-33 passes (test on a temp store).
-- [ ] ISC-39: `rekey` changes the passphrase: old key fails, new key opens (temp store test).
-- [ ] ISC-40: `check` reports `encrypted: true|false` from the header without needing a key.
-- [ ] ISC-41: `scripts/status.ts` prints encrypted flag, row counts, and last pushes.
-- [ ] ISC-42: Anti: no message body text from a temp store appears in its `-wal` file after a write (WAL pages encrypted).
-- [ ] ISC-43: `tests/crypto.test.ts` covers ISC-35, ISC-37, ISC-39, ISC-42.
-- [ ] ISC-44: Anti: no script writes under `corpus/` (grep for writes targeting the corpus path returns none).
+- [x] ISC-31: `scripts/encrypt.ts` exists with subcommands `migrate`, `rekey`, `check`.
+- [x] ISC-32: `encrypt.ts migrate --dry` prints the plan and leaves `embeddings/` byte-identical (mtimes unchanged, no new files).
+- [x] ISC-33: `migrate` exports via `sqlcipher_export` into a sibling file and compares `files`, `chunks`, `docs` counts before swapping.
+- [x] ISC-34: After migration the first 16 bytes of `embeddings/index.db` are not `SQLite format 3\0`.
+- [x] ISC-35: After migration, opening `embeddings/index.db` without a key fails with "file is not a database".
+- [x] ISC-36: After migration, `openStore()` with the key reports the pre-migration counts (905,207 chunks, 54,614 files — two rows landed between the first probe and migration).
+- [x] ISC-37: `migrate` on an already-encrypted file exits non-zero with "already encrypted".
+- [x] ISC-38: The plaintext original and its `-wal`/`-shm` sidecars are removed only after ISC-33 passes (test on a temp store).
+- [x] ISC-39: `rekey` changes the passphrase: old key fails, new key opens (temp store test).
+- [x] ISC-40: `check` reports `encrypted: true|false` from the header without needing a key.
+- [x] ISC-41: `scripts/status.ts` prints encrypted flag, row counts, and last pushes.
+- [x] ISC-42: Anti: no message body text from a temp store appears in its `-wal` file after a write (WAL pages encrypted).
+- [x] ISC-43: `tests/crypto.test.ts` covers ISC-35, ISC-37, ISC-39, ISC-42.
+- [x] ISC-44: Anti: no script writes under `corpus/` (grep for writes targeting the corpus path returns none).
 
 ### Ingester — general
 - [x] ISC-45: `scripts/ingest.ts` accepts a `.zip` path.
@@ -115,7 +115,7 @@ CONSTRAINTS.md is committed first; `bun scripts/ingest.ts <archive>` ingests Cha
 - [x] ISC-49: `--provider chatgpt|claude|gemini` overrides detection.
 - [x] ISC-50: `--dry` prints conversation and message counts per role and leaves the database row counts unchanged.
 - [x] ISC-51: Zip entries are streamed with `unzip -p`; grep of `ingest.ts` shows no `mkdtemp`, `tmpdir`, or extraction to disk.
-- [ ] ISC-52: When `unzip` is absent the error names the fallback (extract manually, pass the directory).
+- [x] ISC-52: When `unzip` is absent the error names the fallback (extract manually, pass the directory).
 - [x] ISC-53: Ingesting the same fixture twice leaves conversation and message counts unchanged.
 - [x] ISC-54: Ingesting a modified export with the same conversation source_id replaces that conversation's messages (upsert).
 - [x] ISC-55: Anti: `users.json` / `user.json` are never read; the fixture's account email does not appear anywhere in the database.
@@ -167,7 +167,7 @@ CONSTRAINTS.md is committed first; `bun scripts/ingest.ts <archive>` ingests Cha
 
 ### Gemini parser
 - [x] ISC-97: Locates `My Activity/Gemini Apps/MyActivity.json` at any depth in a directory or zip.
-- [ ] ISC-98: Only entries whose `products` include "Gemini Apps" are used.
+- [x] ISC-98: Only entries whose `products` include "Gemini Apps" are used.
 - [x] ISC-99: `title: "Prompted X"` becomes a `user` message with body X.
 - [x] ISC-100: `safeHtmlItem[].html` becomes an `assistant` message with tags stripped and entities decoded.
 - [x] ISC-101: Block-level HTML (`p`, `br`, `li`, `div`, headings) becomes newlines.
@@ -182,50 +182,50 @@ CONSTRAINTS.md is committed first; `bun scripts/ingest.ts <archive>` ingests Cha
 - [x] ISC-110: An HTML-only Takeout (`MyActivity.html`, no JSON) exits 1 with "re-export as JSON".
 
 ### query.ts
-- [ ] ISC-111: `query.ts` opens the store through `openStore()`.
-- [ ] ISC-112: Results from conversations show provider, title, role, and date with a snippet.
-- [ ] ISC-113: Results from files (`chunks`) still appear, labelled `file`.
-- [ ] ISC-114: `--source conv|files|all` filters sources.
-- [ ] ISC-115: `--limit N` caps results.
-- [ ] ISC-116: No matches prints exactly "no matches".
-- [ ] ISC-117: A query containing `"`, `:` or `*` does not throw (terms are quoted).
-- [ ] ISC-118: A three-term query on the 2 GB encrypted index completes in ≤1,000 ms.
+- [x] ISC-111: `query.ts` opens the store through `openStore()`.
+- [x] ISC-112: Results from conversations show provider, title, role, and date with a snippet.
+- [x] ISC-113: Results from files (`chunks`) still appear, labelled `file`.
+- [x] ISC-114: `--source conv|files|all` filters sources.
+- [x] ISC-115: `--limit N` caps results.
+- [x] ISC-116: No matches prints exactly "no matches".
+- [x] ISC-117: A query containing `"`, `:` or `*` does not throw (terms are quoted).
+- [x] ISC-118: A three-term query on the 2 GB encrypted index completes in ≤1,000 ms.
 
 ### collect.ts
-- [ ] ISC-119: `collect.ts` opens the store through `openStore()`.
-- [ ] ISC-120: `collect.ts --dry` leaves row counts unchanged.
-- [ ] ISC-121: `collect.ts` on the fixtures directory indexes text files into `chunks` (count > 0).
-- [ ] ISC-122: Anti: `collect.ts` skips the store's own `embeddings/` directory.
+- [x] ISC-119: `collect.ts` opens the store through `openStore()`.
+- [x] ISC-120: `collect.ts --dry` leaves row counts unchanged.
+- [x] ISC-121: `collect.ts` on the fixtures directory indexes text files into `chunks` (count > 0).
+- [x] ISC-122: Anti: `collect.ts` skips the store's own `embeddings/` directory.
 
 ### forget.ts
-- [ ] ISC-123: `scripts/forget.ts <conversation-id>` deletes the conversation and its messages.
-- [ ] ISC-124: `forget.ts --provider X` deletes every conversation of that provider.
-- [ ] ISC-125: `forget.ts --dry` prints what would be deleted and changes no counts.
-- [ ] ISC-126: After forget, `query.ts` no longer returns the deleted text (FTS in sync).
-- [ ] ISC-127: `forget.ts` with no selector exits 1 with usage.
+- [x] ISC-123: `scripts/forget.ts <conversation-id>` deletes the conversation and its messages.
+- [x] ISC-124: `forget.ts --provider X` deletes every conversation of that provider.
+- [x] ISC-125: `forget.ts --dry` prints what would be deleted and changes no counts.
+- [x] ISC-126: After forget, `query.ts` no longer returns the deleted text (FTS in sync).
+- [x] ISC-127: `forget.ts` with no selector exits 1 with usage.
 
 ### push.ts
-- [ ] ISC-128: `push.ts` checkpoints the WAL before copying.
-- [ ] ISC-129: The copy excludes `corpus/`, `.git/`, and `node_modules/` (absent on target).
-- [ ] ISC-130: Anti: `push.ts` refuses with exit 1 when `embeddings/index.db` has a plaintext SQLite header.
-- [ ] ISC-131: Verification reopens the copied index through `openStore()` with the key and prints chunks, files, conversations, messages counts.
-- [ ] ISC-132: A failed reopen on the target exits 1 with "index did not open on target".
-- [ ] ISC-133: `push.ts --dry` prints size, free space, and file list and copies nothing.
-- [ ] ISC-134: `push.ts --pull` still works (temp target round-trip).
-- [ ] ISC-135: A successful push appends `{target, at, counts}` to `manifest.json` `pushes[]`.
-- [ ] ISC-136: Anti: `manifest.json` never contains the passphrase (test greps after push).
-- [ ] ISC-137: `push.ts` prints the libsqlcipher install hint for the reader machine.
-- [ ] ISC-138: `tests/push.test.ts` pushes a temp store to a temp target and passes verification.
+- [x] ISC-128: `push.ts` checkpoints the WAL before copying.
+- [x] ISC-129: The copy excludes `corpus/`, `.git/`, and `node_modules/` (absent on target).
+- [x] ISC-130: Anti: `push.ts` refuses with exit 1 when `embeddings/index.db` has a plaintext SQLite header.
+- [x] ISC-131: Verification reopens the copied index through `openStore()` with the key and prints chunks, files, conversations, messages counts.
+- [x] ISC-132: A failed reopen on the target exits 1 with "index did not open on target".
+- [x] ISC-133: `push.ts --dry` prints size, free space, and file list and copies nothing.
+- [x] ISC-134: `push.ts --pull` still works (temp target round-trip).
+- [x] ISC-135: A successful push appends `{target, at, counts}` to `manifest.json` `pushes[]`.
+- [x] ISC-136: Anti: `manifest.json` never contains the passphrase (test greps after push).
+- [x] ISC-137: `push.ts` prints the libsqlcipher install hint for the reader machine.
+- [x] ISC-138: `tests/push.test.ts` pushes a temp store to a temp target and passes verification.
 
 ### Tests, hygiene, real data
-- [ ] ISC-139: `bun test` passes with 0 failures.
-- [ ] ISC-140: Anti: `tests/` never reference `embeddings/index.db`; every test sets `AI_MEMORY_HOME` to a temp dir.
-- [ ] ISC-141: Every script prints usage and exits non-zero when called with no arguments (or `--help`).
+- [x] ISC-139: `bun test` passes with 0 failures.
+- [x] ISC-140: Anti: `tests/` never reference `embeddings/index.db`; every test sets `AI_MEMORY_HOME` to a temp dir.
+- [x] ISC-141: Every script prints usage and exits non-zero when called with no arguments (or `--help`).
 - [x] ISC-142: `package.json` has no `dependencies` or `devDependencies` keys.
-- [ ] ISC-143: Anti: grep finds no `/Users/taboost` in tracked files.
+- [x] ISC-143: Anti: grep finds no `/Users/taboost` in tracked files.
 - [x] ISC-144: `ingest.ts --dry` on the real Claude export reports 116 conversations.
-- [ ] ISC-145: The real Claude export is ingested into the encrypted store and `query.ts` returns a hit from it.
-- [ ] ISC-146: `manifest.json` stats include conversations and messages counts; Obsidian `NEXT.md` carries the ai-memory state line.
+- [x] ISC-145: The real Claude export is ingested into the encrypted store and `query.ts` returns a hit from it.
+- [x] ISC-146: `manifest.json` stats include conversations and messages counts; Obsidian `NEXT.md` carries the ai-memory state line.
 
 ### Display backend (added 2026-09-14 — user asked for a backend for the localhost front end)
 - [x] ISC-147: `scripts/serve.ts` binds 127.0.0.1 only and serves `ui/` (index.html, app.js, styles.css) with no other static paths.
@@ -286,11 +286,23 @@ CONSTRAINTS.md is committed first; `bun scripts/ingest.ts <archive>` ingests Cha
 - 2026-09-14T00:10Z — Front end found at ~/-ai-memory (node static server, port 3000, fully simulated data). Consolidated into ~/ai-memory/ui/ and backed by serve.ts; simulated nodes/responses replaced with store reads so the page obeys CONSTRAINTS.md (admits empty results, marks inferred threads). Old server left running untouched.
 - 2026-09-14T00:15Z — Interceptor extension not connected in Chrome; visual verification done through the Claude-in-Chrome extension (real browser, not CDP).
 
+- 2026-09-14T00:30Z — Auto-mode permission classifier denied the edits that wire an outbound model call (question + snippets → Anthropic API) into serve.ts/ui, citing data exfiltration. Not worked around. ask.ts and its test are parked untracked in wip/ (gitignored); CONSTRAINTS.md already records the opt-in exception. User decides whether to allow.
+- 2026-09-14T00:30Z — Forge reported GPT-5.4 unavailable on this Codex account; ran on gpt-5.6-terra. Doctrine model pin is stale (surface to user).
+
 ## Changelog
 
 - 2026-09-13T23:49Z — conjectured: `corpus/` must itself be encrypted to satisfy the hard rule. refuted_by: FirstPrinciples challenge — the rule forbids the *system* writing plaintext there; documents can live inside the encrypted DB. learned: name the corpus correctly and the second encryption layer disappears. criterion_now: ISC-44 (no script writes under corpus/) and ISC-129 (push excludes corpus/).
 
+- 2026-09-14T00:35Z — conjectured: the two anti-network tests could stay as a blanket "no fetch/URL in scripts/". refuted_by: serve.ts legitimately prints loopback URLs and the opt-in ask layer needs one outbound call. learned: the invariant is "outbound network code lives in exactly one file, off without a key", not "no URLs". criterion_now: ingest/parsers test asserts no network code; the parked ask test asserts outbound code only in lib/ask.ts.
+
 ## Verification
+
+- ISC-31..44, 111..141: `bun test` → `54 pass, 0 fail` across crypto/push/tools/ingest/serve suites (Forge slice independently re-verified: keyless open → "file is not a database"; WAL nonce absent; push target has no corpus/; manifest pushes[] without passphrase).
+- ISC-34..36 (real index): `encrypt.ts migrate --dry` → counts files=54614 chunks=905207 docs=2, nothing touched; `migrate` → "✓ encrypted", 25 s, plaintext + -wal/-shm gone, `index.db.meta.json` written; `encrypt.ts check` → `encrypted: true`.
+- ISC-118: `time bun scripts/query.ts "sourdough starter timing" --limit 3` on the 2.4 GB encrypted index → 0.205 s total.
+- ISC-145: `ingest.ts <real Claude export>` → "✓ stored 116 conversations (0 replaced) · store now 116 conversations · 2,418 messages"; `/api/telemetry` on the real store → counts {files:54614, chunks:905207, conversations:116, messages:2418}.
+- ISC-14, 143: `git status -sb` → `## main...origin/main`; `git grep -l` for the home-directory prefix → none.
+- ISC-146: manifest.json stats carry conversations/messages; Obsidian NEXT.md section "ai-memory" added 2026-09-14.
 
 - ISC-147..156: `bun test tests/serve.test.ts` → `7 pass, 0 fail, 29 expect() calls`; Chrome screenshot of http://127.0.0.1:3131 shows "ONLINE · ENCRYPTED", "6 SHOWN", inspector "Debug a bun test / Claude / 2 messages"; console errors: none; search "sourdough Denver" → "[STORE] 3 matches in 57 ms", inspector switched to the Gemini thread with "Thread boundary inferred from timing".
 
