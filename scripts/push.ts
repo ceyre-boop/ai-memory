@@ -15,11 +15,25 @@ import {
   type Counts,
 } from "./lib/db.ts";
 import { fmtInt, parseArgs, usage } from "./lib/cli.ts";
-import { existsSync, mkdirSync, readdirSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const USAGE = "usage: bun scripts/push.ts <target> [--dry] [--pull] [--key-file path]";
-const EXCLUDES = ["corpus/", ".git/", "node_modules/", "*.db-wal", "*.db-shm"];
+// Allowlist, not a blocklist: only these top-level entries ever reach media.
+// .env, *.key, corpus/, wip/, .git/ can never ride along by omission.
+const COPY_ENTRIES = ["embeddings", "scripts", "ui", "tests", "manifest.json", "package.json", "CONSTRAINTS.md", "README.md", "ISA.md"];
+const NEVER_COPIED = "corpus/, .git/, node_modules/, wip/, .env*, *.key, *.db-wal, *.db-shm";
+const EXCLUDES = ["*.db-wal", "*.db-shm", ".env", ".env.*", "*.key", "node_modules/"];
+const SECRET_NAME = /^\.env(\..*)?$|\.key$/;
+
+/** Children never see the passphrase or any API key. */
+function scrubbedEnv(): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const [k, v] of Object.entries(process.env)) {
+    if (v !== undefined && !/KEY|TOKEN|SECRET|PASS/i.test(k)) env[k] = v;
+  }
+  return env;
+}
 
 interface CommandResult {
   stdout: string;
@@ -40,7 +54,7 @@ function textOutput(value: unknown, command: string, stream: "stdout" | "stderr"
 function runCommand(command: string, args: string[]): CommandResult {
   let result: ReturnType<typeof Bun.spawnSync>;
   try {
-    result = Bun.spawnSync({ cmd: [command, ...args], stdout: "pipe", stderr: "pipe" });
+    result = Bun.spawnSync({ cmd: [command, ...args], stdout: "pipe", stderr: "pipe", env: scrubbedEnv() });
   } catch (error) {
     throw new StoreError(`${command} could not run: ${errorMessage(error)}`);
   }
@@ -107,11 +121,41 @@ function withTrailingSlash(path: string): string {
   return path.endsWith("/") ? path : path + "/";
 }
 
-function copyWithExclusions(source: string, destination: string, deleteExcluded: boolean): void {
-  const options = ["-a"];
-  if (deleteExcluded) options.push("--delete-excluded");
-  for (const exclude of EXCLUDES) options.push("--exclude", exclude);
-  runCommand("rsync", [...options, withTrailingSlash(source), withTrailingSlash(destination)]);
+/** Copy only the allowlisted entries; prune anything else at the top level of the destination. */
+function copyAllowlisted(source: string, destination: string, prune: boolean, scanSecrets: boolean): void {
+  mkdirSync(destination, { recursive: true });
+  for (const entry of COPY_ENTRIES) {
+    const from = join(source, entry);
+    if (!existsSync(from)) continue;
+    const isDir = statSync(from).isDirectory();
+    const options = ["-a", "--delete"];
+    for (const exclude of EXCLUDES) options.push("--exclude", exclude);
+    if (isDir) runCommand("rsync", [...options, withTrailingSlash(from), withTrailingSlash(join(destination, entry))]);
+    else runCommand("rsync", ["-a", from, join(destination, entry)]);
+  }
+  if (prune) {
+    for (const entry of readdirSync(destination)) {
+      if (!COPY_ENTRIES.includes(entry)) rmSync(join(destination, entry), { recursive: true, force: true });
+    }
+  }
+  // Only media is scanned. The local primary legitimately holds .env / key files
+  // and must never be pruned by a pull.
+  const leaked = scanSecrets ? findSecrets(destination) : [];
+  if (leaked.length) {
+    for (const f of leaked) rmSync(f, { force: true });
+    throw new StoreError(`secret-looking files were about to land on the target and were removed: ${leaked.join(", ")}`);
+  }
+}
+
+function findSecrets(dir: string, depth = 0): string[] {
+  const out: string[] = [];
+  if (depth > 4) return out;
+  for (const entry of readdirSync(dir)) {
+    const p = join(dir, entry);
+    if (SECRET_NAME.test(entry)) out.push(p);
+    else if (statSync(p).isDirectory()) out.push(...findSecrets(p, depth + 1));
+  }
+  return out;
 }
 
 function parseKilobytes(value: string, command: string): number {
@@ -139,9 +183,15 @@ function targetFreeBytes(target: string): number {
   return kilobytes * 1024;
 }
 
-function storeBytes(): number {
-  const command = `du -sk ${ROOT}`;
-  return parseKilobytes(runCommand("du", ["-sk", ROOT]).stdout, command) * 1024;
+/** Size of what would actually be copied (allowlisted entries only). */
+function storeBytes(root: string = ROOT): number {
+  let total = 0;
+  for (const entry of COPY_ENTRIES) {
+    const p = join(root, entry);
+    if (!existsSync(p)) continue;
+    total += parseKilobytes(runCommand("du", ["-sk", p]).stdout, `du -sk ${p}`) * 1024;
+  }
+  return total;
 }
 
 function formatGigabytes(bytes: number): string {
@@ -156,17 +206,11 @@ function printCapacity(size: number, free: number): void {
   console.log(`store ${formatGigabytes(size)} · free ${formatGigabytes(free)}`);
 }
 
-function isExcludedTopLevelEntry(name: string): boolean {
-  return name === "corpus" || name === ".git" || name === "node_modules" || name.endsWith(".db-wal") || name.endsWith(".db-shm");
-}
-
-function printDryPlan(size: number, free: number): void {
+function printDryPlan(size: number, free: number, source: string = ROOT): void {
   printCapacity(size, free);
   console.log("would copy top-level entries:");
-  for (const entry of readdirSync(ROOT).sort()) {
-    const suffix = isExcludedTopLevelEntry(entry) ? " (skipped)" : "";
-    console.log(`  ${entry}${suffix}`);
-  }
+  for (const entry of COPY_ENTRIES) if (existsSync(join(source, entry))) console.log(`  ${entry}`);
+  console.log(`never copied: ${NEVER_COPIED}`);
 }
 
 function checkpointAndCount(key: string): Counts {
@@ -184,7 +228,7 @@ function verifyTarget(path: string, key: string): Counts {
     const db = openStore({ path, key, readonly: true });
     let value: Counts;
     try {
-      value = counts(db);
+      value = counts(db, true); // strict: a missing table is a failure, not a zero
     } finally {
       db.close();
     }
@@ -214,6 +258,7 @@ async function push(target: string, destination: string, dry: boolean): Promise<
     printDryPlan(size, free);
     return;
   }
+  requireMountedWritableTarget(target);
   if (size > free) throw new StoreError("not enough space on target");
 
   const key = getKey(process.argv.slice(2));
@@ -222,9 +267,8 @@ async function push(target: string, destination: string, dry: boolean): Promise<
   printCapacity(size, free);
 
   console.log(`▸ pushing ${ROOT} → ${destination}`);
-  mkdirSync(destination, { recursive: true });
   const started = Date.now();
-  copyWithExclusions(ROOT, destination, true);
+  copyAllowlisted(ROOT, destination, true, true);
   const elapsedSeconds = Math.max((Date.now() - started) / 1000, 0.001);
   const megabytesPerSecond = size / 1024 ** 2 / elapsedSeconds;
   console.log(`✓ copied in ${elapsedSeconds.toFixed(1)}s (${megabytesPerSecond.toFixed(0)} MB/s)`);
@@ -246,17 +290,30 @@ async function push(target: string, destination: string, dry: boolean): Promise<
   console.log(`eject when done:\n  diskutil eject ${target}`);
 }
 
+/** The inverse of push, held to the same rule: the source index must open with the key before it may replace the primary. */
 function pull(destination: string, dry: boolean): void {
   if (!existsSync(destination) || !targetIsMountedDirectory(destination)) {
     throw new StoreError(`no store at ${destination}`);
   }
+  const remoteIndex = join(destination, "embeddings", "index.db");
+  const plaintext = isPlaintextSqlite(remoteIndex);
+  if (plaintext === null) throw new StoreError(`no index at ${remoteIndex}`);
+  if (plaintext) throw new StoreError("refusing to pull a plaintext store");
+  const size = storeBytes(destination);
   if (dry) {
     console.log(`would pull ${destination} → ${ROOT}`);
+    printDryPlan(size, Number.POSITIVE_INFINITY, destination);
     return;
   }
-  mkdirSync(ROOT, { recursive: true });
-  copyWithExclusions(destination, ROOT, false);
-  console.log("✓ pulled");
+  const key = getKey(process.argv.slice(2));
+  const remoteCounts = verifyTarget(remoteIndex, key);
+  console.log(`✓ source index opens with the key: ${describeCounts(remoteCounts)}`);
+  copyAllowlisted(destination, ROOT, false, false);
+  const localCounts = verifyTarget(DB_PATH, key);
+  if (describeCounts(remoteCounts) !== describeCounts(localCounts)) {
+    throw new StoreError(`pulled index does not match source\nsource: ${describeCounts(remoteCounts)}\nlocal: ${describeCounts(localCounts)}`);
+  }
+  console.log(`✓ pulled and verified: ${describeCounts(localCounts)}`);
 }
 
 async function main(): Promise<void> {
@@ -269,7 +326,8 @@ async function main(): Promise<void> {
   if (parsed.flags.has("help") || parsed.positional.length !== 1) usage(usageText());
 
   const target = parsed.positional[0];
-  requireMountedWritableTarget(target);
+  // --dry must not touch the target: the write probe runs only on a real push.
+  if (!targetIsMountedDirectory(target)) throw new StoreError(`${target} not mounted. Plug it in.`);
   const destination = join(target, "ai-memory");
   if (parsed.flags.has("pull")) {
     pull(destination, parsed.flags.has("dry"));

@@ -74,7 +74,10 @@ export function parseClaude(data: unknown, opts: ParseOptions = {}): ParseResult
     msgs.forEach((m, i) => {
       const parts = Array.isArray(m.content) ? m.content : null;
       const chunks: string[] = [];
-      let body = parts ? renderParts(parts, opts) : (m.text ?? "");
+      // content[] wins when it renders to something; an empty or marker-only
+      // content[] must not discard a populated legacy `text` field.
+      let body = parts ? renderParts(parts, opts) : "";
+      if (!body.trim() && m.text) body = m.text;
       if (body) chunks.push(body);
       for (const a of m.attachments ?? []) {
         attachments++;

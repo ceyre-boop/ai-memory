@@ -57,15 +57,15 @@ export function parseGemini(data: unknown, opts: ParseOptions = {}): ParseResult
 
   type Entry = { time: number; prompt: string; response: string | null };
   const entries: Entry[] = [];
-  let notPrompt = 0, notGemini = 0;
+  let notPrompt = 0, notGemini = 0, noTime = 0;
   for (const raw of data as Item[]) {
-    const isGemini = raw?.header === "Gemini Apps" || raw?.products?.includes("Gemini Apps");
+    const isGemini = Array.isArray(raw?.products) && raw.products.includes("Gemini Apps");
     if (!isGemini) { notGemini++; continue; }
     const title = raw.title ?? "";
     const m = /^Prompted\s+([\s\S]*)$/.exec(title);
     if (!m) { notPrompt++; continue; }
     const time = isoToMs(raw.time);
-    if (time === null) { out.emptySkipped++; continue; }
+    if (time === null) { noTime++; continue; }
     const html = (raw.safeHtmlItem ?? []).map((h) => h.html ?? "").join("\n");
     const response = html ? htmlToText(html) : null;
     entries.push({ time, prompt: m[1].trim(), response: response || null });
@@ -112,6 +112,7 @@ export function parseGemini(data: unknown, opts: ParseOptions = {}): ParseResult
 
   out.notes.push(`Takeout has no thread ids; ${out.conversations.length} threads inferred with a ${opts.gapMinutes ?? DEFAULT_GAP_MINUTES}-minute gap (thread_inferred = 1)`);
   if (notPrompt) out.notes.push(`${notPrompt} activity items were not prompts (e.g. "Used Gemini Apps") and were skipped`);
+  if (noTime) out.notes.push(`${noTime} prompts had no parseable timestamp and were dropped (threads need time)`);
   if (notGemini) out.notes.push(`${notGemini} items from other Google products were ignored`);
   return out;
 }

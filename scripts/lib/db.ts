@@ -256,6 +256,8 @@ export function openStore(opts: OpenOptions = {}): Database {
   if (!opts.readonly) {
     db.run("PRAGMA journal_mode = WAL");
     db.run("PRAGMA foreign_keys = ON");
+    // cascade / REPLACE deletes must still fire the messages_fts delete trigger
+    db.run("PRAGMA recursive_triggers = ON");
     ensureSchema(db);
   }
   return db;
@@ -270,11 +272,17 @@ export interface Counts {
   messages: number;
 }
 
-export function counts(db: Database): Counts {
+/**
+ * Row counts. Lenient by default (a missing table reads as 0, for stores that
+ * predate a table). Pass strict=true wherever a count is used as proof — a
+ * missing or unreadable table must then fail loudly, never bless a zero.
+ */
+export function counts(db: Database, strict = false): Counts {
   const one = (sql: string) => {
     try {
       return (db.query(sql).get() as { c: number }).c;
-    } catch {
+    } catch (e) {
+      if (strict) throw new StoreError(`count failed (${sql.replace(/SELECT count\(\*\) c FROM /, "")}): ${(e as Error).message}`);
       return 0;
     }
   };

@@ -137,6 +137,20 @@ export function parseChatGPT(data: unknown, opts: ParseOptions = {}): ParseResul
       for (const c of node.children ?? []) visit(c);
     };
     for (const r of roots) visit(r.id);
+    // Nodes unreachable via children[] (parent link present but not listed by
+    // the parent, or a parent cycle) are swept in as branches, never dropped.
+    const unreachable = Object.keys(mapping).filter((id) => !visited.has(id));
+    if (unreachable.length) {
+      main.clear(); // their path status is unknowable; mark them off-path via visit()
+      const keep = new Set(messages.map((m) => m.id));
+      for (const id of unreachable.sort()) visit(id);
+      const swept = messages.filter((m) => !keep.has(m.id));
+      for (const m of swept) { m.onMainPath = false; branches++; }
+      out.notes.push(`${swept.length} messages in conversation "${conv.title ?? sourceId}" were not linked from any parent's children[]; kept as branches (on_main_path = 0)`);
+    }
+    if (typeof conv.current_node !== "string" || !mapping[conv.current_node]) {
+      out.notes.push(`conversation "${conv.title ?? sourceId}": current_node missing — main path unknown, all messages marked on_main_path = 1`);
+    }
 
     out.conversations.push({
       provider: "chatgpt",

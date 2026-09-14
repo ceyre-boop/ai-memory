@@ -81,7 +81,9 @@ async function readZip(zip: string): Promise<Source> {
     throw new StoreError(`no conversations.json or Gemini MyActivity.json inside ${zip}`);
   }
   // stream the one entry we need straight into memory — nothing is extracted to disk
-  const proc = Bun.spawn(["unzip", "-p", zip, pick], { stdout: "pipe", stderr: "pipe" });
+  const env: Record<string, string> = {};
+  for (const [k, v] of Object.entries(process.env)) if (v !== undefined && !/KEY|TOKEN|SECRET|PASS/i.test(k)) env[k] = v;
+  const proc = Bun.spawn(["unzip", "-p", zip, pick], { stdout: "pipe", stderr: "pipe", env });
   const text = await new Response(proc.stdout).text();
   if ((await proc.exited) !== 0) throw new StoreError(`unzip failed on ${pick}`);
   return { label: basename(zip), text, entry: pick, skipped };
@@ -208,6 +210,21 @@ async function main() {
   let replaced = 0;
   const existing = new Set((db.query("SELECT id FROM conversations WHERE provider = ?").all(provider) as { id: string }[]).map((r) => r.id));
 
+  // Inferred threads (Gemini) are keyed on a boundary that --gap-minutes moves.
+  // Re-ingesting the same activity span must replace every inferred thread
+  // inside that span, not just the ones whose id happens to repeat.
+  const inferredThreads = result.conversations.filter((c) => c.threadInferred && c.createdAt !== null);
+  let spanReplaced = 0;
+  if (inferredThreads.length) {
+    const lo = Math.min(...inferredThreads.map((c) => c.createdAt as number));
+    const hi = Math.max(...inferredThreads.map((c) => c.updatedAt ?? (c.createdAt as number)));
+    const stale = db.query(`SELECT id FROM conversations WHERE provider = ? AND thread_inferred = 1
+      AND created_at BETWEEN ? AND ?`).all(provider, lo, hi) as { id: string }[];
+    const delConv = db.prepare("DELETE FROM conversations WHERE id = ?");
+    db.transaction(() => { for (const s of stale) { delMsgs.run(s.id); delConv.run(s.id); existing.delete(s.id); } })();
+    spanReplaced = stale.length;
+  }
+
   const tx = db.transaction(() => {
     for (const c of result.conversations) {
       const cid = `${provider}:${c.sourceId}`;
@@ -230,6 +247,7 @@ async function main() {
     files: after.files, chunks: after.chunks, last_ingest: new Date(now).toISOString() };
   await writeManifest(m);
 
+  if (spanReplaced) console.log(`  replaced ${fmtInt(spanReplaced)} previously inferred threads in the same time span`);
   console.log(`\n✓ stored ${fmtInt(result.conversations.length)} conversations (${fmtInt(replaced)} replaced)` +
     ` · store now ${fmtInt(after.conversations)} conversations · ${fmtInt(after.messages)} messages` +
     ` (+${fmtInt(after.messages - before.messages)})`);

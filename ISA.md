@@ -4,11 +4,11 @@ slug: 20260913-234958_ai-memory-foundation
 project: ai-memory
 effort: deep
 effort_source: classifier
-phase: verify
-progress: 156/156
+phase: complete
+progress: 165/165
 mode: interactive
 started: 2026-09-13T23:49:58Z
-updated: 2026-09-14T00:40:00Z
+updated: 2026-09-14T00:55:00Z
 ---
 
 ## Problem
@@ -167,7 +167,7 @@ CONSTRAINTS.md is committed first; `bun scripts/ingest.ts <archive>` ingests Cha
 
 ### Gemini parser
 - [x] ISC-97: Locates `My Activity/Gemini Apps/MyActivity.json` at any depth in a directory or zip.
-- [x] ISC-98: Only entries whose `products` include "Gemini Apps" are used.
+- [x] ISC-98: Only entries whose `products` array includes "Gemini Apps" are used (header alone is not enough).
 - [x] ISC-99: `title: "Prompted X"` becomes a `user` message with body X.
 - [x] ISC-100: `safeHtmlItem[].html` becomes an `assistant` message with tags stripped and entities decoded.
 - [x] ISC-101: Block-level HTML (`p`, `br`, `li`, `div`, headings) becomes newlines.
@@ -220,7 +220,7 @@ CONSTRAINTS.md is committed first; `bun scripts/ingest.ts <archive>` ingests Cha
 ### Tests, hygiene, real data
 - [x] ISC-139: `bun test` passes with 0 failures.
 - [x] ISC-140: Anti: `tests/` never reference `embeddings/index.db`; every test sets `AI_MEMORY_HOME` to a temp dir.
-- [x] ISC-141: Every script prints usage and exits non-zero when called with no arguments (or `--help`).
+- [x] ISC-141: Every script that takes a required argument (ingest, query, collect, encrypt, forget, push) prints usage and exits non-zero without it; status and serve run bare by design.
 - [x] ISC-142: `package.json` has no `dependencies` or `devDependencies` keys.
 - [x] ISC-143: Anti: grep finds no absolute home-directory path in tracked files.
 - [x] ISC-144: `ingest.ts --dry` on the real Claude export reports 116 conversations.
@@ -238,6 +238,17 @@ CONSTRAINTS.md is committed first; `bun scripts/ingest.ts <archive>` ingests Cha
 - [x] ISC-154: `ui/app.js` contains no simulated data: nodes, inspector, telemetry, and terminal read only from the API; empty results say "no matches".
 - [x] ISC-155: `tests/serve.test.ts` covers ISC-147..153 against a temp store built from the fixtures.
 - [x] ISC-156: The page renders in real Chrome with zero console errors, live counts, and a search that highlights hit nodes and switches the inspector.
+
+### Audit fixes (Cato, 2026-09-14)
+- [x] ISC-157: push copies an allowlist of top-level entries; `.env*`, `*.key`, `wip/`, `corpus/`, `.git/` are never on the target (planted-secret test).
+- [x] ISC-158: push scans the target for secret-looking files after copy and fails loudly if any landed; the scan never runs against the local primary.
+- [x] ISC-159: `push --dry` writes nothing to the target, not even a probe file.
+- [x] ISC-160: `--pull` refuses a plaintext source and verifies the source index opens with the key before, and the local index after, the copy.
+- [x] ISC-161: Gemini re-ingest at a different `--gap-minutes` replaces every inferred thread inside the export time span (2 → 4 → 2 conversations, message count constant).
+- [x] ISC-162: ChatGPT nodes unreachable through `children[]` are kept as branches with a note; a missing `current_node` is noted rather than asserted as a main path.
+- [x] ISC-163: A Claude message with empty `content[]` falls back to its `text` field.
+- [x] ISC-164: `counts(db, true)` throws on a missing table; push/pull verification uses it, so a zero is never blessed.
+- [x] ISC-165: Child processes (rsync, du, df, unzip) run with an env scrubbed of KEY/TOKEN/SECRET/PASS variables; `recursive_triggers` is ON so cascade deletes keep messages_fts in sync.
 
 ## Test Strategy
 
@@ -289,13 +300,20 @@ CONSTRAINTS.md is committed first; `bun scripts/ingest.ts <archive>` ingests Cha
 - 2026-09-14T00:30Z — Auto-mode permission classifier denied the edits that wire an outbound model call (question + snippets → Anthropic API) into serve.ts/ui, citing data exfiltration. Not worked around. ask.ts and its test are parked untracked in wip/ (gitignored); CONSTRAINTS.md already records the opt-in exception. User decides whether to allow.
 - 2026-09-14T00:30Z — Forge reported GPT-5.4 unavailable on this Codex account; ran on gpt-5.6-terra. Doctrine model pin is stale (surface to user).
 
+- 2026-09-14T00:50Z — Cato verdict: concerns, 2 critical (push copied .env/*.key to media; Gemini gap change duplicated threads). Both fixed with regression tests (tests/audit.test.ts). Of the warnings/infos: 8 fixed (dry probe, unverified pull, counts-as-zero, unreachable ChatGPT nodes, empty Claude content[], child env, recursive triggers, ISC-98/141 wording, CONSTRAINTS ask paragraph), 1 accepted (passphrase in SQL text is inherent to SQLCipher PRAGMA key), 1 reduced (no-timestamp entries now a separate note).
+- 2026-09-14T00:50Z — The pull test caught a bug the audit did not: the new secret scan, run on pull, would have deleted the local .env. Scan is media-only now (ISC-158).
+
 ## Changelog
 
 - 2026-09-13T23:49Z — conjectured: `corpus/` must itself be encrypted to satisfy the hard rule. refuted_by: FirstPrinciples challenge — the rule forbids the *system* writing plaintext there; documents can live inside the encrypted DB. learned: name the corpus correctly and the second encryption layer disappears. criterion_now: ISC-44 (no script writes under corpus/) and ISC-129 (push excludes corpus/).
 
 - 2026-09-14T00:35Z — conjectured: the two anti-network tests could stay as a blanket "no fetch/URL in scripts/". refuted_by: serve.ts legitimately prints loopback URLs and the opt-in ask layer needs one outbound call. learned: the invariant is "outbound network code lives in exactly one file, off without a key", not "no URLs". criterion_now: ingest/parsers test asserts no network code; the parked ask test asserts outbound code only in lib/ask.ts.
 
+- 2026-09-14T00:50Z — conjectured: a blocklist of excluded paths keeps secrets off removable media. refuted_by: Cato — .env and *.key were not in the list; any new secret file would ride along by omission. learned: the safe shape is an allowlist of what ships plus a scan of the target, and the scan must never touch the primary. criterion_now: ISC-157, ISC-158.
+
 ## Verification
+
+- ISC-157..165: `bun test` → `60 pass, 0 fail` across 6 files including tests/audit.test.ts; manual `push` then `--pull` round trip on a temp target prints "✓ pulled and verified: files=0 chunks=0 conversations=2 messages=6".
 
 - ISC-31..44, 111..141: `bun test` → `54 pass, 0 fail` across crypto/push/tools/ingest/serve suites (Forge slice independently re-verified: keyless open → "file is not a database"; WAL nonce absent; push target has no corpus/; manifest pushes[] without passphrase).
 - ISC-34..36 (real index): `encrypt.ts migrate --dry` → counts files=54614 chunks=905207 docs=2, nothing touched; `migrate` → "✓ encrypted", 25 s, plaintext + -wal/-shm gone, `index.db.meta.json` written; `encrypt.ts check` → `encrypted: true`.
