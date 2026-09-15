@@ -5,8 +5,9 @@
 import type { Database } from "bun:sqlite";
 import { StoreError, fail, openStore } from "./lib/db.ts";
 import { fmtDate, parseArgs, usage } from "./lib/cli.ts";
+import { hasVectors, rrf, vectorSearch } from "./lib/vsearch.ts";
 
-const USAGE = 'usage: bun scripts/query.ts "<question>" [--limit N] [--source all|conv|files] [--key-file path]';
+const USAGE = 'usage: bun scripts/query.ts "<question>" [--limit N] [--source all|conv|files] [--keyword] [--key-file path]';
 
 interface ConversationRow {
   id: unknown;
@@ -132,6 +133,61 @@ function fileHits(db: Database, terms: string, limit: number): Hit[] {
   }
 }
 
+/** Look up the display rows for vector hits, which carry only ids. */
+function hydrate(db: Database, hits: { kind: "message" | "file"; ref_id: number; score: number }[]): Hit[] {
+  const out: Hit[] = [];
+  for (const h of hits) {
+    if (h.kind === "message") {
+      const r = db.query(
+        `SELECT m.id, c.id AS conversation_id, c.provider, c.title, m.role, m.created_at,
+                substr(m.body, 1, 240) AS snippet
+         FROM messages m JOIN conversations c ON c.id = m.conversation_id
+         WHERE m.rid = ?`).get(h.ref_id) as any;
+      if (r) out.push({ kind: "conversation", score: -h.score, snippet: String(r.snippet ?? ""),
+        id: String(r.id), conversation_id: String(r.conversation_id), provider: String(r.provider),
+        title: r.title === null ? null : String(r.title), role: String(r.role),
+        created_at: typeof r.created_at === "number" ? r.created_at : null });
+    } else {
+      const r = db.query("SELECT path, substr(body,1,240) AS snippet FROM chunks WHERE rowid = ?")
+        .get(h.ref_id) as any;
+      if (r) out.push({ kind: "file", score: -h.score, snippet: String(r.snippet ?? ""), path: String(r.path) });
+    }
+  }
+  return out;
+}
+
+const hitKey = (h: Hit): string => h.kind === "conversation" ? `m:${h.id}` : `f:${h.path}:${h.snippet.slice(0,40)}`;
+
+/**
+ * Hybrid retrieval: bm25 and vector lists fused by reciprocal rank. Falls back
+ * to keyword-only when the store has no vectors, so query works either way.
+ */
+export async function searchHybrid(
+  db: Database, question: string, opts: { limit?: number; source?: Source } = {},
+): Promise<Hit[]> {
+  const limit = opts.limit ?? 8;
+  const source = opts.source ?? "all";
+  const keyword = search(db, question, { limit: limit * 4, source });
+  if (!hasVectors(db)) return keyword.slice(0, limit);
+
+  const kinds = source === "conv" ? ["message"] as const
+              : source === "files" ? ["file"] as const
+              : ["message", "file"] as const;
+  let vec: Hit[] = [];
+  try {
+    vec = hydrate(db, await vectorSearch(db, question, { limit: limit * 4, kinds: [...kinds] }));
+  } catch { vec = []; }                       // embedder down → keyword still works
+
+  const fused = rrf([keyword, vec], hitKey);
+  const byKey = new Map<string, Hit>();
+  for (const h of [...keyword, ...vec]) if (!byKey.has(hitKey(h))) byKey.set(hitKey(h), h);
+  return [...fused.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([k]) => byKey.get(k)!)
+    .filter(Boolean)
+    .slice(0, limit);
+}
+
 /** Merged full-text search over conversations and collected files, best bm25 first. */
 export function search(db: Database, question: string, opts: { limit?: number; source?: Source } = {}): Hit[] {
   const limit = opts.limit ?? 8;
@@ -157,10 +213,10 @@ function parsePositiveInteger(value: string): number | null {
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
-function main(): void {
+async function main(): Promise<void> {
   let parsed;
   try {
-    parsed = parseArgs(process.argv.slice(2), ["help"], ["limit", "source"]);
+    parsed = parseArgs(process.argv.slice(2), ["help", "keyword"], ["limit", "source"]);
   } catch (error) {
     const message = error instanceof Error ? error.message : "invalid arguments";
     usage(`${USAGE}\n${message}`, 2);
@@ -181,7 +237,9 @@ function main(): void {
 
   const db = openStore({ readonly: true });
   try {
-    const hits = search(db, parsed.positional[0], { limit, source });
+    const hits = parsed.flags.has("keyword")
+      ? search(db, parsed.positional[0], { limit, source })
+      : await searchHybrid(db, parsed.positional[0], { limit, source });
     if (hits.length === 0) {
       console.log("no matches");
       return;
@@ -195,9 +253,5 @@ function main(): void {
 }
 
 if (import.meta.main) {
-  try {
-    main();
-  } catch (error) {
-    fail(error);
-  }
+  main().catch(fail);
 }
