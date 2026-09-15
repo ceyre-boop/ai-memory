@@ -98,4 +98,8 @@ Your conversations mention other people: colleagues, friends, family, public fig
   inside an AI coding session (the `CLAUDECODE` environment variable is set); from there only `--dry` works.
   What goes on the chip, and therefore what the assistant can ever recall, is decided by a person at a
   terminal.
+- Sweeping local files into the store is the same kind of act. `collect` refuses to write when run from
+  inside an AI coding session, the same `CLAUDECODE` check and the same `--dry` escape hatch as `push`.
+  What gets swept in, and therefore what the assistant can ever recall, is decided by a person at a
+  terminal here too.
 - Changing any rule on this page requires editing this page first, in its own commit.
