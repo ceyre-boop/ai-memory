@@ -23,6 +23,13 @@ Anything that costs money, changes state, or leaves the machine.
 - Spawning sub-agents
 - Publishing anything
 
+**Standing approval, one exception.** JARVIS's `/api/chat` (`server.ts`) is the product's main path:
+every message the operator sends is itself the approval for the outbound call that answers it — there
+is no separate confirmation step, and gating one behind the other would break the thing being demoed.
+This differs from `ask` and `contradictions`, which also require the call to originate from a human
+terminal (see `CONSTRAINTS.md`); `/api/chat` carries no such check. The boundary that still holds: the
+operator decides what gets sent by choosing to send it, turn by turn.
+
 ## Tier 3 — Never
 
 Not capability limits. Boundaries that keep the operator's judgment load-bearing.
