@@ -36,6 +36,21 @@ function parsePositiveNumber(value: string): number | null {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
+// CONSTRAINTS.md: sweeping files into the store is a human act, same as
+// push. Inside an AI coding session (CLAUDECODE set), every write is
+// refused; --dry still works so the assistant can show what it *would*
+// collect, never do it.
+function requireHumanOperator(dry: boolean): void {
+  if (dry) return;
+  if (process.env.CLAUDECODE) {
+    throw new StoreError(
+      "refusing to write to the store from inside an AI coding session (CLAUDECODE is set) — " +
+      "sweeping files into your record is a human act here. Run this command yourself in a " +
+      "normal terminal. --dry still works from here.",
+    );
+  }
+}
+
 function chunk(text: string): string[] {
   const parts: string[] = [];
   for (let index = 0; index < text.length; index += CHUNK - OVERLAP) {
@@ -120,6 +135,7 @@ async function main(): Promise<void> {
   if (maxMegabytes === null) usage(`${USAGE}\n--max-mb must be a positive number`);
 
   const dry = parsed.flags.has("dry");
+  requireHumanOperator(dry);
   const sources = await readableSources(parsed.positional);
   const stats: Stats = { scanned: 0, indexed: 0, cataloged: 0, dupes: 0, skipped: 0, chunks: 0, bytes: 0 };
   const startedAt = Date.now();

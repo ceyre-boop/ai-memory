@@ -157,6 +157,29 @@ test("push refuses to write to media from inside an AI session (CLAUDECODE set);
   } finally { cleanup(home); rmSync(target, { recursive: true, force: true }); }
 });
 
+test("collect refuses to write to the store from inside an AI session (CLAUDECODE set); --dry still works", () => {
+  const home = makeHome();
+  const source = mkdtempSync(join(tmpdir(), "ai-memory-collect-guard-"));
+  try {
+    writeFileSync(join(source, "note.md"), "a file worth collecting\n");
+
+    // simulate running from inside an AI coding session
+    const dry = run("collect.ts", [source, "--dry"], { AI_MEMORY_HOME: home, CLAUDECODE: "1" });
+    expect(dry.code).toBe(0);
+    expect(existsSync(join(home, "embeddings", "index.db"))).toBe(false);
+
+    const real = run("collect.ts", [source], { AI_MEMORY_HOME: home, CLAUDECODE: "1" });
+    expect(real.code).not.toBe(0);
+    expect(real.stderr).toContain("refusing to write to the store from inside an AI coding session");
+    expect(existsSync(join(home, "embeddings", "index.db"))).toBe(false);
+
+    // the same command, run as if from a normal terminal, is allowed
+    const human = run("collect.ts", [source], { AI_MEMORY_HOME: home });
+    expect(human.code).toBe(0);
+    expect(existsSync(join(home, "embeddings", "index.db"))).toBe(true);
+  } finally { cleanup(home); rmSync(source, { recursive: true, force: true }); }
+});
+
 test("push --eject: CLAUDECODE guard refuses a real eject, allows --dry; --pull+--eject is rejected", () => {
   const home = makeHome();
   const target = mkdtempSync(join(tmpdir(), "ai-memory-eject-guard-"));
