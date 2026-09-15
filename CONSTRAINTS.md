@@ -22,18 +22,25 @@ context and rent the model. This is memory infrastructure, nothing more.
    searchable body unless you pass `--include-thinking`.
 4. **Skips account-identity files** in every archive (`users.json`, `user.json`): your name, email,
    and phone are not conversation memory and are never written to the store.
-5. **Indexes for search** (FTS5) so `query` answers from your own record, and prints "no matches"
+5. **Indexes for search** (FTS5 keyword plus local vector embeddings) so `query` answers from your own record, and prints "no matches"
    rather than inventing a result. With a model key configured, `ask` sends the question and the
    matching snippets to the model; the answer must cite which snippet it came from and say "not in
    your record" when the snippets do not contain the answer. Every answer lists its sources.
-6. **Copies to the media you name** with `push`, then reopens the copied index on that media with
+6. **Embeds locally, on this machine only.** Vectors are computed by a model running on your own
+   hardware (Ollama on `127.0.0.1`, default `nomic-embed-text`). Text goes to loopback and never
+   leaves the machine: no embedding provider, no API key, no account. Vectors live in the same
+   encrypted store as the text, quantized to int8. If the local model is unavailable, `embed`
+   stops with an error and never falls back to a hosted service. `query` works with or without
+   vectors; without them it is keyword-only.
+7. **Copies to the media you name** with `push`, then reopens the copied index on that media with
    your key and counts rows before it says "verified". A copy that does not reopen is a failure.
-7. **Deletes on request.** `forget <conversation-id>` or `forget --provider X` removes conversations
-   and their search index entries together.
+8. **Deletes on request.** `forget <conversation-id>` or `forget --provider X` removes conversations,
+   their search index entries, and their vectors together.
 
 ## What it never does
 
 - Never fetches, scrapes, or automates anything against a provider account.
+- Never sends text to a hosted embedding service. Embedding is local-only over loopback, or it fails.
 - Never sends data anywhere, with one opt-in exception: `ask` sends your question plus the top-k
   matching snippets to the model provider you configure — by default the `claude` CLI signed in to your
   own subscription, or the Messages API with `ANTHROPIC_API_KEY` (read from `.env`, never logged, never
