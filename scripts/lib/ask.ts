@@ -285,6 +285,91 @@ export async function findContradictions(topic: string, hits: Hit[]): Promise<Co
   return { ...parsed, raw, model: data.model ?? cfg.model, snippets_sent: hits.length, usage: data.usage };
 }
 
+// Character contract, standing-pattern mode: the system never supplies its
+// own standard for what counts as a mistake or a rule — it only cites the
+// standard back when the person already stated it themselves. Same
+// integrity rule as ask()'s "Not in your record": no standard in the
+// snippet, no flag. This is what keeps standing-pattern flagging inside
+// Tier 1 (recall) instead of crossing into Tier 3 (the system deciding
+// what matters) — see GOVERNANCE.md.
+export const STANDING_SYSTEM_PROMPT = `You compare a current topic against numbered snippets from one person's own past AI conversations and notes, looking for a standing pattern: a moment where the person themselves, in their own words, already named this same kind of situation a mistake, a rule they set for themselves, or a pattern they wanted to stop repeating.
+
+The standard must come from the snippet, never from you. A flag requires BOTH:
+- The snippet's own words contain a self-characterization — the person naming something as wrong, a mistake, a rule, a "note to self," a habit to stop, a decision never to do this again — not merely a fact or an event with no self-judgment attached.
+- The current topic is the same specific situation the snippet is talking about, not just a loosely related theme.
+
+Do NOT flag: a preference, an opinion, a fact with no self-judgment attached, an evolving plan, or anything where you would be supplying the standard yourself rather than quoting theirs. If you are not confident the snippet contains their own words naming this a pattern, say nothing about it — a standard you invented is worse than one you missed.
+
+For each real standing pattern, output exactly this block, nothing else around it:
+PATTERN: <one-line, neutral name for the pattern, drawn from the snippet's own words>
+SAID: [<snippet number>] <the self-characterization, quoted or tightly paraphrased from that snippet>
+NOW: <one neutral sentence on why the current topic matches that same situation>
+---
+
+If you find several, output several blocks in a row, each ending with its own "---" line. If you find none, output exactly this line and nothing else:
+NOTHING STANDING.
+
+Never state a date or a source name yourself — reference snippets only by their [n] number; the numbers are the only thing that will be trusted. Never add advice or a recommendation beyond quoting what they already said.`;
+
+export function buildStandingMessage(topic: string, hits: Hit[]): string {
+  if (!hits.length) return `Topic: ${topic}\n\n(no matching snippets in the record)`;
+  const lines = hits.map((h, i) =>
+    `[${i + 1}] (${describeHit(h)})\n${h.snippet.replace(/[«»]/g, "").replace(/\s+/g, " ").trim()}`);
+  return `Topic: ${topic}\n\nSnippets from the record, in no particular order:\n\n${lines.join("\n\n")}`;
+}
+
+export interface StandingPattern {
+  name: string;
+  now: string;
+  said: { n: number; hit: Hit };
+}
+
+/**
+ * Parse the model's PATTERN/SAID/NOW blocks against the real hit list. A
+ * block citing a snippet number outside [1, hits.length] is dropped rather
+ * than trusted — the model names an index, this function is the only source
+ * of the date/title/snippet text that gets printed, exactly as
+ * parseContradictions() does for the contradiction mode it mirrors.
+ */
+export function parseStandingPatterns(reply: string, hits: Hit[]): { patterns: StandingPattern[]; noneFound: boolean; unparsed: boolean } {
+  const text = reply.trim();
+  if (/^NOTHING STANDING\.?$/i.test(text)) return { patterns: [], noneFound: true, unparsed: false };
+
+  const blocks = text.split(/\n---\s*\n?/).map((b) => b.trim()).filter(Boolean);
+  const patterns: StandingPattern[] = [];
+  const blockRe = /PATTERN:\s*(.+?)\s*\nSAID:\s*\[(\d+)\]\s*.*?\s*\nNOW:\s*(.+)/s;
+  for (const block of blocks) {
+    const m = blockRe.exec(block);
+    if (!m) continue;
+    const [, name, nStr, now] = m;
+    const n = Number(nStr);
+    if (!(n >= 1 && n <= hits.length)) continue;
+    patterns.push({ name: name.trim(), now: now.trim(), said: { n, hit: hits[n - 1] } });
+  }
+  return { patterns, noneFound: false, unparsed: patterns.length === 0 };
+}
+
+export interface StandingResult {
+  patterns: StandingPattern[];
+  noneFound: boolean;
+  unparsed: boolean;
+  raw: string;
+  model: string;
+  snippets_sent: number;
+  usage?: { input_tokens?: number; output_tokens?: number };
+}
+
+export async function findStandingPatterns(topic: string, hits: Hit[]): Promise<StandingResult> {
+  const cfg = modelConfig();
+  const data = await messages({
+    model: cfg.model, max_tokens: 2048, system: STANDING_SYSTEM_PROMPT,
+    messages: [{ role: "user", content: buildStandingMessage(topic, hits) }],
+  });
+  const raw = textOf(data) || "NOTHING STANDING.";
+  const parsed = parseStandingPatterns(raw, hits);
+  return { ...parsed, raw, model: data.model ?? cfg.model, snippets_sent: hits.length, usage: data.usage };
+}
+
 export async function ask(question: string, hits: Hit[]): Promise<AskResult> {
   const cfg = modelConfig();
   const data = await messages({

@@ -9,7 +9,10 @@ Read-only operations over the corpus. No approval, no cost, no state change.
 
 - Retrieval and citation of prior conversations
 - Contradiction flags (same specific claim asserted incompatibly)
-- Standing-question extraction — recurring concerns across instances
+- Standing-pattern flags (`standing`) — a topic the operator's own record already named a mistake, a
+  rule, or a pattern, cited back to their own words. The standard always comes from a retrieved
+  snippet, never from the system itself — same discipline as a contradiction flag, aimed at decisions
+  instead of facts. Pull-only: run by the operator, never delivered on the system's own initiative.
 - Constraint violations: flagging when a proposed action conflicts with `CONSTRAINTS.md`
 - Recurrence counts: "you have asked a version of this N times"
 
