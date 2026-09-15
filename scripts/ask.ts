@@ -11,18 +11,23 @@
 import { openStore, fail, StoreError } from "./lib/db";
 import { parseArgs, usage, fmtInt } from "./lib/cli";
 import { search, type Hit, type Source } from "./query";
-import { ask, expandQuestion, mergeHits, buildUserMessage, describeHit, citedIndices, modelConfig, SYSTEM_PROMPT } from "./lib/ask";
+import { ask, expandQuestion, mergeHits, buildUserMessage, describeHit, citedIndices, modelConfig, SYSTEM_PROMPT, findStandingPatterns } from "./lib/ask";
 
 const USAGE = `
-usage: bun scripts/ask.ts "question" [--k 8] [--dry] [--no-expand] [--source all|conv|files] [--key-file <path>]
+usage: bun scripts/ask.ts "question" [--k 8] [--dry] [--no-expand] [--no-patterns] [--source all|conv|files] [--key-file <path>]
 
   Answers only from the top-k snippets of your own record; says "Not in your record." otherwise.
-  --k N        snippets to send (default 8)
-  --dry        print the retrieved snippets and the assembled prompt; call no API (expansion skipped)
-  --no-expand  search the question as typed; default asks a small model for 3 keyword variants first
-  --source     conv (default: your conversations) | files (collected files) | all
+  --k N          snippets to send (default 8)
+  --dry          print the retrieved snippets and the assembled prompt; call no API (expansion skipped)
+  --no-expand    search the question as typed; default asks a small model for 3 keyword variants first
+  --no-patterns  skip the standing-pattern check (same snippets, one more call) — on by default
+  --source       conv (default: your conversations) | files (collected files) | all
 
   Provider: the claude CLI on your subscription (default) or AI_MEMORY_PROVIDER=api with ANTHROPIC_API_KEY in .env.
+
+  Asking also checks whether your own record already named this same kind of situation a mistake,
+  a rule, or a pattern — cited to your own words, same as standing.ts. You're already asking; this
+  doesn't leave the machine on its own between questions. See GOVERNANCE.md.
 `;
 
 function when(ms: number | null | undefined): string {
@@ -53,7 +58,7 @@ function requireHumanOperator(dry: boolean): void {
 async function main() {
   let args;
   try {
-    args = parseArgs(process.argv.slice(2), ["dry", "no-expand", "help"], ["k", "source"]);
+    args = parseArgs(process.argv.slice(2), ["dry", "no-expand", "no-patterns", "help"], ["k", "source"]);
   } catch (e) {
     usage(`${(e as Error).message}\n${USAGE}`);
   }
@@ -132,6 +137,28 @@ async function main() {
   }
   console.log(`\n— ${r.model} via ${cfg.label} · ${fmtInt(r.snippets_sent)} snippets sent · ${askMs} ms` +
     (r.usage ? ` · ${fmtInt(r.usage.input_tokens ?? 0)} in / ${fmtInt(r.usage.output_tokens ?? 0)} out tokens` : ""));
+
+  // 4. standing-pattern check — same hits already retrieved, no new search.
+  // Same integrity rule as the answer above: cites the user's own words or
+  // says nothing. Skippable with --no-patterns; never a separate approval
+  // step, since asking the question already was one. See GOVERNANCE.md.
+  if (!args.flags.has("no-patterns")) {
+    try {
+      const p = await findStandingPatterns(question, hits);
+      if (!p.noneFound && !p.unparsed && p.patterns.length) {
+        console.log("\n⚑ Also standing in your record:");
+        for (const pat of p.patterns) {
+          const h = pat.said.hit;
+          const where = h.kind === "conversation" ? `${h.provider} · ${h.title ?? "(untitled)"} · ${when(h.created_at)}` : `file · ${h.path}`;
+          console.log(`  ${pat.name} — [${pat.said.n}] ${where}`);
+          console.log(`    "${h.snippet.replace(/[«»]/g, "").replace(/\s+/g, " ").trim()}"`);
+        }
+      }
+    } catch {
+      // Non-fatal: the answer above already stands on its own; a failed
+      // pattern check is never worth surfacing as an error for this.
+    }
+  }
 }
 
 main().catch(fail);

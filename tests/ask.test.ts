@@ -53,9 +53,17 @@ beforeAll(() => {
       calls.push(body);
       if (req.headers.get("x-api-key") !== "test-key-123") return Response.json({ error: { message: "bad key" } }, { status: 401 });
       const isExpand = String(body.system).startsWith("You rewrite a question");
-      const text = isExpand
-        ? '["sourdough starter", "ferment days", "cold kitchen"]'
-        : (String(body.messages[0].content).includes("altitude") ? "Not in your record." : "Let it ferment 5 to 7 days [1]; cold kitchens take longer [3].");
+      const isStanding = String(body.system).startsWith("You compare a current topic");
+      const content = String(body.messages[0].content);
+      let text: string;
+      if (isExpand) text = '["sourdough starter", "ferment days", "cold kitchen"]';
+      else if (isStanding) {
+        if (content.includes("[break-standing]")) return Response.json({ error: { message: "simulated outage" } }, { status: 500 });
+        text = content.includes("[force-pattern]")
+          ? 'PATTERN: forgetting the starter\nSAID: [1] noted forgetting to feed the starter as a recurring mistake\nNOW: same starter-care situation\n---'
+          : "NOTHING STANDING.";
+      }
+      else text = content.includes("altitude") ? "Not in your record." : "Let it ferment 5 to 7 days [1]; cold kitchens take longer [3].";
       return Response.json({ model: body.model, stop_reason: "end_turn", content: [{ type: "text", text }], usage: { input_tokens: 10, output_tokens: 5 } });
     },
   });
@@ -95,16 +103,16 @@ test("loadDotEnv reads KEY=VALUE without overriding existing env", () => {
 
 test("no args → usage; api provider without a key → clear error; cli provider without a binary → clear error", async () => {
   expect((await runAsk([])).code).not.toBe(0);
-  const r = await runAsk(["sourdough"], { AI_MEMORY_PROVIDER: "api" });
+  const r = await runAsk(["sourdough", "--no-patterns"], { AI_MEMORY_PROVIDER: "api" });
   expect(r.code).not.toBe(0);
   expect(r.err).toContain("no model configured");
-  const c = await runAsk(["sourdough"], { AI_MEMORY_PROVIDER: "claude-cli", AI_MEMORY_CLAUDE_BIN: join(HOME, "nope") });
+  const c = await runAsk(["sourdough", "--no-patterns"], { AI_MEMORY_PROVIDER: "claude-cli", AI_MEMORY_CLAUDE_BIN: join(HOME, "nope") });
   expect(c.code).not.toBe(0);
   expect(c.err).toContain("claude CLI not found");
 });
 
 test("default provider is the claude CLI: no tools, no settings, stdin prompt, cited answer", async () => {
-  const r = await runAsk(["how long should sourdough ferment", "--k", "4"], CLI_ENV());
+  const r = await runAsk(["how long should sourdough ferment", "--k", "4", "--no-patterns"], CLI_ENV());
   expect(r.code).toBe(0);
   expect(r.out).toContain('expanded with: "sourdough starter", "ferment days", "cold kitchen"');
   expect(r.out).toContain("Five to seven days [1]");
@@ -138,7 +146,7 @@ test("--dry retrieves through query.ts, prints snippets + prompt, calls nothing"
 
 test("default run expands with 3 variants, unions results, answers with cited sources", async () => {
   const before = calls.length;
-  const r = await runAsk(["how long should sourdough ferment", "--k", "4"], MOCK_ENV());
+  const r = await runAsk(["how long should sourdough ferment", "--k", "4", "--no-patterns"], MOCK_ENV());
   expect(r.code).toBe(0);
   expect(r.out).toContain('expanded with: "sourdough starter", "ferment days", "cold kitchen"');
   expect(r.out).toContain("Let it ferment 5 to 7 days [1]");
@@ -156,7 +164,7 @@ test("default run expands with 3 variants, unions results, answers with cited so
 
 test("--no-expand makes exactly one call; unanswerable → 'Not in your record.' passed through verbatim", async () => {
   const before = calls.length;
-  const r = await runAsk(["altitude boiling", "--no-expand"], MOCK_ENV());
+  const r = await runAsk(["altitude boiling", "--no-expand", "--no-patterns"], MOCK_ENV());
   expect(r.code).toBe(0);
   expect(calls.length - before).toBe(1);
   expect(r.out).toContain("Not in your record.");
@@ -169,6 +177,42 @@ test("zero hits → nothing sent to the model", async () => {
   expect(r.code).toBe(0);
   expect(r.out).toContain("no matches in the store — nothing sent to the model");
   expect(calls.length).toBe(before);
+});
+
+test("standing-pattern check runs by default, on the same hits, as a second call", async () => {
+  const before = calls.length;
+  const r = await runAsk(["how long should sourdough ferment", "--no-expand"], MOCK_ENV());
+  expect(r.code).toBe(0);
+  expect(calls.length - before).toBe(2); // one answer call + one standing-pattern call, no expansion
+  const answer = calls[before], pattern = calls[before + 1];
+  expect(answer.system).toBe(SYSTEM_PROMPT);
+  expect(String(pattern.system)).toContain("You compare a current topic");
+  expect(pattern.messages[0].content).toContain("Topic: how long should sourdough ferment");
+  // nothing found in this case (no [force-pattern] marker) — no block printed
+  expect(r.out).not.toContain("Also standing in your record");
+});
+
+test("--no-patterns skips the second call entirely", async () => {
+  const before = calls.length;
+  const r = await runAsk(["how long should sourdough ferment", "--no-expand", "--no-patterns"], MOCK_ENV());
+  expect(r.code).toBe(0);
+  expect(calls.length - before).toBe(1);
+  expect(r.out).not.toContain("Also standing in your record");
+});
+
+test("a real standing pattern prints cited, with real hit metadata — not the model's own text", async () => {
+  const r = await runAsk(["[force-pattern] how long should sourdough ferment", "--no-expand"], MOCK_ENV());
+  expect(r.code).toBe(0);
+  expect(r.out).toContain("⚑ Also standing in your record:");
+  expect(r.out).toContain("forgetting the starter — [1] chatgpt · Sourdough starter timing · 2024-06-10");
+  expect(r.out).toContain('"How long should I let a sourdough starter ferment before the first bake?"'); // real snippet text, not the model's paraphrase
+});
+
+test("a failed standing-pattern call never breaks the main answer", async () => {
+  const r = await runAsk(["[break-standing] how long should sourdough ferment", "--no-expand"], MOCK_ENV());
+  expect(r.code).toBe(0);
+  expect(r.out).toContain("Let it ferment 5 to 7 days [1]"); // main answer unaffected
+  expect(r.out).not.toContain("Also standing in your record"); // pattern check failed silently, not fatally
 });
 
 test("outbound network code lives only in ask.ts (hosted) and embed.ts (loopback)", () => {

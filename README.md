@@ -116,7 +116,7 @@ the Messages API instead, set `AI_MEMORY_PROVIDER=api` and put `ANTHROPIC_API_KE
 | command | what it does |
 |---|---|
 | `bun scripts/ingest.ts <export.zip\|dir\|file> [--provider chatgpt\|claude\|gemini] [--dry] [--include-thinking] [--gap-minutes 30]` | Parse a provider export into the store. Auto-detects the provider; skips account-identity files. |
-| `bun scripts/ask.ts "question" [--k 8] [--dry] [--no-expand] [--source conv\|files\|all]` | Answer from your own record with cited sources, or "Not in your record." `--dry` shows what would be sent and sends nothing. |
+| `bun scripts/ask.ts "question" [--k 8] [--dry] [--no-expand] [--no-patterns] [--source conv\|files\|all]` | Answer from your own record with cited sources, or "Not in your record." Also checks whether the same snippets already name this a standing pattern, cited — `--no-patterns` turns that off. `--dry` shows what would be sent and sends nothing. |
 | `bun scripts/contradictions.ts "topic" [--k 20] [--dry] [--no-expand] [--source conv\|files\|all]` | Find where your record asserts the same specific thing two incompatible ways, dated and cited. Reports nothing when unsure. |
 | `bun scripts/standing.ts "topic" [--k 20] [--dry] [--no-expand] [--source conv\|files\|all]` | Find where you already named this same kind of situation a mistake, a rule, or a pattern — in your own words, cited. Never a standard the model supplies itself. You run it; nothing calls it for you. |
 | `bun scripts/query.ts "phrase" [--limit 5] [--source all\|conv\|files] [--keyword]` | Hybrid search: bm25 keyword and vector similarity fused by reciprocal rank. `--keyword` forces keyword-only. Works with or without vectors. |
