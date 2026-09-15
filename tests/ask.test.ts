@@ -165,11 +165,16 @@ test("zero hits → nothing sent to the model", async () => {
   expect(calls.length).toBe(before);
 });
 
-test("outbound network code lives only in scripts/lib/ask.ts", () => {
+test("outbound network code lives only in ask.ts (hosted) and embed.ts (loopback)", () => {
   const files: string[] = [];
   const walk = (d: string) => { for (const e of readdirSync(d)) { const p = join(d, e); statSync(p).isDirectory() ? walk(p) : files.push(p); } };
   walk(join(REPO, "scripts"));
-  const offenders = files.filter((f) => !f.endsWith("lib/ask.ts") &&
+  const offenders = files.filter((f) => !f.endsWith("lib/ask.ts") && !f.endsWith("lib/embed.ts") &&
     /\bfetch\(|https?:\/\/(?!127\.0\.0\.1|localhost)/.test(readFileSync(f, "utf8")));
   expect(offenders).toEqual([]);
+
+  // embed.ts may open a socket, but only to loopback — CONSTRAINTS.md item 6.
+  const embed = readFileSync(join(REPO, "scripts", "lib", "embed.ts"), "utf8");
+  const hosts = [...embed.matchAll(/https?:\/\/([^\s"'`$/]+)/g)].map((m) => m[1]);
+  expect(hosts.filter((h) => !/^(127\.0\.0\.1|localhost|\[?::1\]?)(:\d+)?$/.test(h))).toEqual([]);
 });

@@ -11,6 +11,7 @@
     "encrypt": "bun scripts/encrypt.ts",
     "forget": "bun scripts/forget.ts",
     "status": "bun scripts/status.ts",
-    "test": "bun test"
+    "test": "bun test",
+    "embed": "bun scripts/embed.ts"
   }
 }
