@@ -77,6 +77,16 @@
         "conversations": 236,
         "messages": 2919
       }
+    },
+    {
+      "target": "/Volumes/AIMEMORY/ai-memory",
+      "at": "2026-09-15T19:45:23.745Z",
+      "counts": {
+        "files": 54633,
+        "chunks": 907698,
+        "conversations": 236,
+        "messages": 2919
+      }
     }
   ]
 }

@@ -157,6 +157,24 @@ test("push refuses to write to media from inside an AI session (CLAUDECODE set);
   } finally { cleanup(home); rmSync(target, { recursive: true, force: true }); }
 });
 
+test("review refuses to send topics to the model from inside an AI session (CLAUDECODE set); --dry still works", () => {
+  const home = makeHome();
+  try {
+    // --dry is never blocked by the session guard. (On an empty home it still
+    // exits non-zero for a different reason — no store — which is the point:
+    // the guard is not what stopped it.)
+    const dry = run("review.ts", ["--dry", "--days", "3650"], { AI_MEMORY_HOME: home, CLAUDECODE: "1" });
+    expect(dry.stdout + dry.stderr).not.toContain("refusing");
+
+    // a real run is refused before the store is even opened: batching a human
+    // act does not make it automatic.
+    const real = run("review.ts", ["--days", "3650"], { AI_MEMORY_HOME: home, CLAUDECODE: "1" });
+    expect(real.code).not.toBe(0);
+    expect(real.stderr).toContain("refusing to send your topics to the model from inside an AI coding session");
+    expect(real.stderr).not.toContain("no store at");
+  } finally { cleanup(home); }
+});
+
 test("collect refuses to write to the store from inside an AI session (CLAUDECODE set); --dry still works", () => {
   const home = makeHome();
   const source = mkdtempSync(join(tmpdir(), "ai-memory-collect-guard-"));
