@@ -112,4 +112,16 @@ Your conversations mention other people: colleagues, friends, family, public fig
   refuse to call the model when run from inside an AI coding session, the same `CLAUDECODE` check and
   the same `--dry` escape hatch as `push` and `collect`. What leaves the machine, and on whose say-so, is
   decided by a person at a terminal — not by an agent asking on its own behalf.
+- `ask` and `contradictions` retrieval is steerable, all read-only, Tier 1 under `GOVERNANCE.md`: `--more`
+  (next batch, excluding what a local cache says you've already seen for this question — opaque refs
+  only, never the store's plaintext, kept at `~/.config/ai-memory/query-cache.json` by default, same
+  convention as the passphrase file so it never rides a push), `--oldest`/`--newest`/`--since`/`--until`
+  (order or bound by date instead of relevance), and `--chunk` (re-fetch one exact snippet by the stable
+  ref every source line now prints, rather than re-approximating it with a fresh search).
+- When a batch is cut off by `--k`, the only thing either tool is told is a yes/no: whether more exists.
+  Never a match count — FTS5's counts say nothing about answer completeness, and a number invites false
+  precision about coverage, which is a new failure, not a fix for the old one. `ask` may mention it
+  inline, cited to that signal; `contradictions`' own structured reply format never carries it — the
+  note there is printed by the CLI itself, deterministically, so `NO CONTRADICTIONS FOUND.` stays exactly
+  that literal string and nothing riskier gets asked of the parser.
 - Changing any rule on this page requires editing this page first, in its own commit.
