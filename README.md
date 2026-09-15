@@ -118,7 +118,8 @@ the Messages API instead, set `AI_MEMORY_PROVIDER=api` and put `ANTHROPIC_API_KE
 | `bun scripts/ingest.ts <export.zip\|dir\|file> [--provider chatgpt\|claude\|gemini] [--dry] [--include-thinking] [--gap-minutes 30]` | Parse a provider export into the store. Auto-detects the provider; skips account-identity files. |
 | `bun scripts/ask.ts "question" [--k 8] [--dry] [--no-expand] [--source conv\|files\|all]` | Answer from your own record with cited sources, or "Not in your record." `--dry` shows what would be sent and sends nothing. |
 | `bun scripts/contradictions.ts "topic" [--k 20] [--dry] [--no-expand] [--source conv\|files\|all]` | Find where your record asserts the same specific thing two incompatible ways, dated and cited. Reports nothing when unsure. |
-| `bun scripts/query.ts "phrase" [--limit 5] [--source all\|conv\|files]` | Raw full-text search over conversations and collected files. |
+| `bun scripts/query.ts "phrase" [--limit 5] [--source all\|conv\|files] [--keyword]` | Hybrid search: bm25 keyword and vector similarity fused by reciprocal rank. `--keyword` forces keyword-only. Works with or without vectors. |
+| `bun scripts/embed.ts [--kind file\|message\|all] [--limit N] [--batch 64] [--dry]` | Build vector embeddings with a model on **this machine** (Ollama, loopback only). Resumable — re-running embeds only what is missing. Never calls a hosted embedding service. |
 | `bun scripts/collect.ts <dir...> [--max-mb 5] [--dry]` | Sweep local folders (notes, code) into the same store. |
 | `bun scripts/encrypt.ts migrate\|rekey\|check [--dry]` | Migrate a plaintext index to SQLCipher, change the passphrase, or report the state. |
 | `bun scripts/forget.ts <conversation-id> \| --provider X [--dry]` | Delete conversations and their search entries together. |
