@@ -21,7 +21,9 @@ async function runCli(args: string[], env: Record<string, string> = {}) {
   // Tests simulate a person at a normal terminal, not an AI session issuing
   // the command — scrub CLAUDECODE so contradictions.ts's human-operator
   // guard doesn't fire for every test here. A dedicated test below re-adds it to prove the guard works.
-  const spawnEnv: Record<string, string | undefined> = { ...process.env, AI_MEMORY_HOME: HOME, AI_MEMORY_KEY: KEY, ANTHROPIC_API_KEY: "", AI_MEMORY_NO_DOTENV: "1", ...env };
+  // AI_MEMORY_QUERY_CACHE isolated too — contradictions.ts's --more writes
+  // into it by default, and the real path is ~/.config/ai-memory/query-cache.json.
+  const spawnEnv: Record<string, string | undefined> = { ...process.env, AI_MEMORY_HOME: HOME, AI_MEMORY_KEY: KEY, ANTHROPIC_API_KEY: "", AI_MEMORY_NO_DOTENV: "1", AI_MEMORY_QUERY_CACHE: join(HOME, "query-cache.json"), ...env };
   delete spawnEnv.CLAUDECODE;
   if (env.CLAUDECODE !== undefined) spawnEnv.CLAUDECODE = env.CLAUDECODE;
   const p = Bun.spawn({
@@ -55,6 +57,11 @@ async function seedBudgetConflict() {
   insMsg.run("claude:budget:1", "claude:budget", 0, "user", Date.parse("2026-01-10"), "My hard cap for the house is $250k, not going a dollar over that.", 1, '["text"]');
   insConv.run("claude:offer", "claude", "offer", "Offer accepted", Date.parse("2026-03-01"), 1, 0, Date.now());
   insMsg.run("claude:offer:1", "claude:offer", 0, "user", Date.parse("2026-03-01"), "Just put an offer in on the house at $310k, fingers crossed.", 1, '["text"]');
+  // Five dated "gadget" messages — controlled data for --more/--since/--until/--oldest/--newest/--chunk.
+  insConv.run("claude:gadgets", "claude", "gadgets", "Gadget planning", Date.parse("2026-01-01"), 5, 0, Date.now());
+  for (let i = 1; i <= 5; i++) {
+    insMsg.run(`claude:gadgets:${i}`, "claude:gadgets", i, "user", Date.parse(`2026-01-0${i}`), `Gadget note number ${i}`, 1, '["text"]');
+  }
   db.close();
 }
 
@@ -99,8 +106,8 @@ const HITS: Hit[] = [
 test("buildContradictionMessage numbers snippets with provenance; empty hits say so", () => {
   const m = buildContradictionMessage("house budget", HITS);
   expect(m).toContain("Topic: house budget");
-  expect(m).toContain('[1] (claude · "House budget" · user · 2026-01-10)\nhard cap at 250k');
-  expect(m).toContain('[2] (claude · "Offer accepted" · user · 2026-03-01)\noffer went in at 310k');
+  expect(m).toContain('[1] (claude · "House budget" · user · 2026-01-10 · ?)\nhard cap at 250k');
+  expect(m).toContain('[2] (claude · "Offer accepted" · user · 2026-03-01 · ?)\noffer went in at 310k');
   expect(buildContradictionMessage("x", [])).toContain("(no matching snippets in the record)");
   expect(CONTRADICTION_SYSTEM_PROMPT).toContain("NO CONTRADICTIONS FOUND.");
   expect(CONTRADICTION_SYSTEM_PROMPT).toContain("say nothing");
@@ -176,6 +183,72 @@ test("'no contradictions' and unparsable replies are both reported honestly, nev
   expect(bad.code).toBe(0);
   expect(bad.out).toContain("didn't match the expected contradiction format");
   expect(bad.out).toContain("I looked but couldn't form a clean comparison here.");
+});
+
+// ── steerable retrieval: --more, --oldest/--newest, --since/--until, --chunk ──
+
+test("--dry shows truncation state; the note is CLI-side, never inside the model's structured reply", async () => {
+  const cut = await runCli(["gadget", "--dry", "--no-expand", "--k", "2", "--source", "conv"], MOCK_ENV());
+  expect(cut.code).toBe(0);
+  expect(cut.out).toContain("2 snippets retrieved");
+  expect(cut.out).toContain("more available — run --more");
+
+  const full = await runCli(["gadget", "--dry", "--no-expand", "--k", "10", "--source", "conv"], MOCK_ENV());
+  expect(full.code).toBe(0);
+  expect(full.out).toContain("5 snippets retrieved");
+  expect(full.out).not.toContain("more available");
+});
+
+test("truncated batch prints a deterministic CLI note after a real (mocked) reply, not baked into NO CONTRADICTIONS FOUND", async () => {
+  const r = await runCli(["gadget", "--no-expand", "--k", "2", "--source", "conv"], MOCK_ENV());
+  expect(r.code).toBe(0);
+  expect(r.out).toContain("No contradictions found on this topic in the retrieved record (this batch).");
+  expect(r.out).toContain("This batch was cut off by --k; more snippets exist on this topic — run --more.");
+});
+
+test("--more excludes what --k already returned and pulls a genuinely disjoint next batch", async () => {
+  // --dry (not a real contradiction) so the retrieved refs are visible in
+  // output regardless of what the model would have said about them.
+  const first = await runCli(["gadget", "--dry", "--no-expand", "--k", "2", "--source", "conv"], MOCK_ENV());
+  const firstRefs = [...first.out.matchAll(/claude:gadgets:\d/g)].map((m) => m[0]);
+  expect(firstRefs.length).toBeGreaterThan(0);
+
+  // Real (non-dry) call first to actually populate the cache — --dry never writes to it.
+  await runCli(["gadget", "--no-expand", "--k", "2", "--source", "conv"], MOCK_ENV());
+  const more = await runCli(["gadget", "--dry", "--no-expand", "--k", "2", "--source", "conv", "--more"], MOCK_ENV());
+  expect(more.out).toContain("--more: excluded 2 already-shown snippet(s)");
+  const moreRefs = [...more.out.matchAll(/claude:gadgets:\d/g)].map((m) => m[0]);
+  expect(moreRefs.length).toBeGreaterThan(0);
+  expect(moreRefs.some((r) => firstRefs.includes(r))).toBe(false);
+});
+
+test("--oldest and --newest reorder by date and are mutually exclusive", async () => {
+  const oldest = await runCli(["gadget", "--dry", "--no-expand", "--k", "5", "--source", "conv", "--oldest"], MOCK_ENV());
+  expect(oldest.out.indexOf("Gadget note number 1")).toBeLessThan(oldest.out.indexOf("Gadget note number 5"));
+  const both = await runCli(["gadget", "--dry", "--oldest", "--newest"], MOCK_ENV());
+  expect(both.code).not.toBe(0);
+  expect(both.err).toContain("mutually exclusive");
+});
+
+test("--since/--until bound the date window", async () => {
+  const r = await runCli(["gadget", "--dry", "--no-expand", "--k", "10", "--source", "conv", "--since", "2026-01-02", "--until", "2026-01-04"], MOCK_ENV());
+  expect(r.code).toBe(0);
+  expect(r.out).toContain("3 snippets retrieved");
+  expect(r.out).not.toContain("Gadget note number 1");
+  expect(r.out).not.toContain("Gadget note number 5");
+});
+
+test("--chunk fetches one exact snippet directly; fewer than 2 means nothing sent to the model", async () => {
+  const r = await runCli(["anything", "--chunk", "claude:gadgets:3"], MOCK_ENV());
+  expect(r.code).toBe(0);
+  expect(r.out).toContain("fetched directly by ref, no search");
+  expect(r.out).toContain("fewer than 2 snippets");
+});
+
+test("--chunk with an unknown ref is a clear error", async () => {
+  const r = await runCli(["anything", "--dry", "--chunk", "claude:gadgets:does-not-exist"], MOCK_ENV());
+  expect(r.code).not.toBe(0);
+  expect(r.err).toContain("no snippet found for --chunk");
 });
 
 test("no output ever contains the passphrase or the API key", async () => {

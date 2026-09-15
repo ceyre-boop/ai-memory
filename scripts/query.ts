@@ -30,6 +30,13 @@ export interface Hit {
   kind: "conversation" | "file";
   score: number;
   snippet: string;
+  /** Stable identity: "<message id>" for conversations, "c:<chunks rowid>" for
+   *  files. Re-fetchable later with fetchByRef() — a snippet cited N turns
+   *  ago is the same object, not a fresh approximation. */
+  ref: string;
+  /** General sort date for --oldest/--newest across mixed sources: same value
+   *  as created_at for conversations, the file's mtime for files. */
+  date: number | null;
   /** conversation hits */
   id?: string;
   conversation_id?: string;
@@ -42,6 +49,27 @@ export interface Hit {
 }
 
 export type Source = "all" | "conv" | "files";
+export type Order = "relevance" | "oldest" | "newest";
+
+export interface SearchOptions {
+  limit?: number;
+  source?: Source;
+  /** unix ms, inclusive */
+  since?: number;
+  /** unix ms, inclusive */
+  until?: number;
+  order?: Order;
+  /** refs (Hit.ref) to exclude — how --more asks for the next batch */
+  exclude?: string[];
+}
+
+export interface SearchPage {
+  hits: Hit[];
+  /** true when more matches existed beyond what was returned — the only
+   *  thing the model is told about coverage; never a count. See
+   *  GOVERNANCE.md and CONSTRAINTS.md on why a count is deliberately not here. */
+  truncated: boolean;
+}
 
 function isMissingTable(error: unknown): boolean {
   return error instanceof Error && /no such table/i.test(error.message);
@@ -80,8 +108,25 @@ export function ftsQuery(question: string): string {
   return (kept.length ? kept : all).map((term) => `"${term.replace(/"/g, '""')}"`).join(" OR ");
 }
 
-function conversationHits(db: Database, terms: string, limit: number): Hit[] {
+interface SubOpts {
+  limit: number;
+  since?: number;
+  until?: number;
+  order: Order;
+  exclude: string[];
+}
+
+function conversationHits(db: Database, terms: string, opts: SubOpts): Hit[] {
   try {
+    const needsDate = opts.order !== "relevance" || opts.since !== undefined || opts.until !== undefined;
+    const conds = ["messages_fts MATCH ?"];
+    const params: unknown[] = [terms];
+    if (needsDate) conds.push("m.created_at IS NOT NULL");
+    if (opts.since !== undefined) { conds.push("m.created_at >= ?"); params.push(opts.since); }
+    if (opts.until !== undefined) { conds.push("m.created_at <= ?"); params.push(opts.until); }
+    if (opts.exclude.length) { conds.push(`m.id NOT IN (${opts.exclude.map(() => "?").join(",")})`); params.push(...opts.exclude); }
+    const orderSql = opts.order === "oldest" ? "m.created_at ASC" : opts.order === "newest" ? "m.created_at DESC" : "score";
+    params.push(opts.limit);
     const rows = db.query(
       `SELECT m.id, c.id AS conversation_id, c.provider, c.title, m.role, m.created_at,
               snippet(messages_fts, 0, '«', '»', '…', 24) AS snippet,
@@ -89,43 +134,61 @@ function conversationHits(db: Database, terms: string, limit: number): Hit[] {
        FROM messages_fts
        JOIN messages AS m ON m.rid = messages_fts.rowid
        JOIN conversations AS c ON c.id = m.conversation_id
-       WHERE messages_fts MATCH ?
-       ORDER BY score
+       WHERE ${conds.join(" AND ")}
+       ORDER BY ${orderSql}
        LIMIT ?`,
-    ).all(terms, limit) as ConversationRow[];
+    ).all(...params) as ConversationRow[];
 
-    return rows.map((row) => ({
-      kind: "conversation",
-      score: requireScore(row.score),
-      snippet: requireText(row.snippet, "conversation snippet"),
-      id: requireText(row.id, "message id"),
-      conversation_id: requireText(row.conversation_id, "conversation id"),
-      provider: requireText(row.provider, "conversation provider"),
-      title: row.title === null ? null : requireText(row.title, "conversation title"),
-      role: requireText(row.role, "conversation role"),
-      created_at: optionalDate(row.created_at),
-    }));
+    return rows.map((row) => {
+      const created_at = optionalDate(row.created_at);
+      const id = requireText(row.id, "message id");
+      return {
+        kind: "conversation" as const,
+        score: requireScore(row.score),
+        snippet: requireText(row.snippet, "conversation snippet"),
+        ref: id,
+        date: created_at,
+        id,
+        conversation_id: requireText(row.conversation_id, "conversation id"),
+        provider: requireText(row.provider, "conversation provider"),
+        title: row.title === null ? null : requireText(row.title, "conversation title"),
+        role: requireText(row.role, "conversation role"),
+        created_at,
+      };
+    });
   } catch (error) {
     if (isMissingTable(error)) return [];
     throw error;
   }
 }
 
-function fileHits(db: Database, terms: string, limit: number): Hit[] {
+function fileHits(db: Database, terms: string, opts: SubOpts): Hit[] {
   try {
+    const conds = ["chunks MATCH ?"];
+    const params: unknown[] = [terms];
+    const needsDate = opts.order !== "relevance" || opts.since !== undefined || opts.until !== undefined;
+    if (needsDate) conds.push("f.mtime IS NOT NULL");
+    if (opts.since !== undefined) { conds.push("f.mtime >= ?"); params.push(opts.since); }
+    if (opts.until !== undefined) { conds.push("f.mtime <= ?"); params.push(opts.until); }
+    if (opts.exclude.length) { conds.push(`('c:' || chunks.rowid) NOT IN (${opts.exclude.map(() => "?").join(",")})`); params.push(...opts.exclude); }
+    const orderSql = opts.order === "oldest" ? "f.mtime ASC" : opts.order === "newest" ? "f.mtime DESC" : "score";
+    params.push(opts.limit);
     const rows = db.query(
-      `SELECT path, snippet(chunks, 1, '«', '»', '…', 24) AS snippet, bm25(chunks) AS score
-       FROM chunks
-       WHERE chunks MATCH ?
-       ORDER BY score
+      `SELECT chunks.rowid AS rowid, chunks.path AS path,
+              snippet(chunks, 1, '«', '»', '…', 24) AS snippet, bm25(chunks) AS score, f.mtime AS mtime
+       FROM chunks LEFT JOIN files AS f ON f.path = chunks.path
+       WHERE ${conds.join(" AND ")}
+       ORDER BY ${orderSql}
        LIMIT ?`,
-    ).all(terms, limit) as FileRow[];
+    ).all(...params) as (FileRow & { rowid: number; mtime: number | null })[];
 
     return rows.map((row) => ({
-      kind: "file",
+      kind: "file" as const,
       score: requireScore(row.score),
       snippet: requireText(row.snippet, "file snippet"),
       path: requireText(row.path, "file path"),
+      ref: `c:${row.rowid}`,
+      date: typeof row.mtime === "number" ? row.mtime : null,
     }));
   } catch (error) {
     if (isMissingTable(error)) return [];
@@ -143,14 +206,16 @@ function hydrate(db: Database, hits: { kind: "message" | "file"; ref_id: number;
                 substr(m.body, 1, 240) AS snippet
          FROM messages m JOIN conversations c ON c.id = m.conversation_id
          WHERE m.rid = ?`).get(h.ref_id) as any;
-      if (r) out.push({ kind: "conversation", score: -h.score, snippet: String(r.snippet ?? ""),
-        id: String(r.id), conversation_id: String(r.conversation_id), provider: String(r.provider),
-        title: r.title === null ? null : String(r.title), role: String(r.role),
-        created_at: typeof r.created_at === "number" ? r.created_at : null });
+      if (r) {
+        const created_at = typeof r.created_at === "number" ? r.created_at : null;
+        out.push({ kind: "conversation", score: -h.score, snippet: String(r.snippet ?? ""), ref: String(r.id), date: created_at,
+          id: String(r.id), conversation_id: String(r.conversation_id), provider: String(r.provider),
+          title: r.title === null ? null : String(r.title), role: String(r.role), created_at });
+      }
     } else {
       const r = db.query("SELECT path, substr(body,1,240) AS snippet FROM chunks WHERE rowid = ?")
         .get(h.ref_id) as any;
-      if (r) out.push({ kind: "file", score: -h.score, snippet: String(r.snippet ?? ""), path: String(r.path) });
+      if (r) out.push({ kind: "file", score: -h.score, snippet: String(r.snippet ?? ""), path: String(r.path), ref: `c:${h.ref_id}`, date: null });
     }
   }
   return out;
@@ -188,17 +253,71 @@ export async function searchHybrid(
     .slice(0, limit);
 }
 
-/** Merged full-text search over conversations and collected files, best bm25 first. */
-export function search(db: Database, question: string, opts: { limit?: number; source?: Source } = {}): Hit[] {
+/**
+ * Full-text search over conversations and collected files, with a truncation
+ * signal: whether more matches existed beyond the returned batch. Internally
+ * over-fetches by one across every active source so the merged pool's true
+ * size is known before the final cut — never a match count, just the one bit
+ * that tells the caller whether --more has anything to give.
+ */
+export function searchPage(db: Database, question: string, opts: SearchOptions = {}): SearchPage {
   const limit = opts.limit ?? 8;
   const source = opts.source ?? "all";
+  const order = opts.order ?? "relevance";
+  const exclude = opts.exclude ?? [];
   const terms = ftsQuery(question);
-  if (!terms) return [];
+  if (!terms) return { hits: [], truncated: false };
+
+  const subOpts: SubOpts = { limit: limit + 1, since: opts.since, until: opts.until, order, exclude };
   const hits: Hit[] = [];
-  if (source === "all" || source === "conv") hits.push(...conversationHits(db, terms, limit));
-  if (source === "all" || source === "files") hits.push(...fileHits(db, terms, limit));
-  hits.sort((left, right) => left.score - right.score);
-  return hits.slice(0, limit);
+  if (source === "all" || source === "conv") hits.push(...conversationHits(db, terms, subOpts));
+  if (source === "all" || source === "files") hits.push(...fileHits(db, terms, subOpts));
+
+  if (order === "oldest") hits.sort((a, b) => (a.date ?? Infinity) - (b.date ?? Infinity));
+  else if (order === "newest") hits.sort((a, b) => (b.date ?? -Infinity) - (a.date ?? -Infinity));
+  else hits.sort((a, b) => a.score - b.score);
+
+  const truncated = hits.length > limit;
+  return { hits: hits.slice(0, limit), truncated };
+}
+
+/** Merged full-text search over conversations and collected files, best bm25 first. Thin wrapper over searchPage() for callers that don't need the truncation signal. */
+export function search(db: Database, question: string, opts: SearchOptions = {}): Hit[] {
+  return searchPage(db, question, opts).hits;
+}
+
+/**
+ * Direct lookup by stable ref — the counterpart to Hit.ref, so a snippet
+ * cited earlier can be re-fetched as the same object rather than
+ * re-approximated by a fresh search. Returns null if the ref no longer
+ * resolves (e.g. the conversation was forgotten).
+ */
+export function fetchByRef(db: Database, ref: string): Hit | null {
+  if (ref.startsWith("c:")) {
+    const rowid = Number(ref.slice(2));
+    if (!Number.isFinite(rowid)) return null;
+    const row = db.query(
+      `SELECT chunks.rowid AS rowid, chunks.path AS path, substr(chunks.body, 1, 600) AS snippet, f.mtime AS mtime
+       FROM chunks LEFT JOIN files AS f ON f.path = chunks.path
+       WHERE chunks.rowid = ?`,
+    ).get(rowid) as { rowid: number; path: string; snippet: string; mtime: number | null } | null;
+    if (!row) return null;
+    return {
+      kind: "file", score: 0, snippet: row.snippet ?? "", path: row.path,
+      ref: `c:${row.rowid}`, date: typeof row.mtime === "number" ? row.mtime : null,
+    };
+  }
+  const row = db.query(
+    `SELECT m.id, c.id AS conversation_id, c.provider, c.title, m.role, m.created_at, substr(m.body, 1, 600) AS snippet
+     FROM messages AS m JOIN conversations AS c ON c.id = m.conversation_id
+     WHERE m.id = ?`,
+  ).get(ref) as { id: string; conversation_id: string; provider: string; title: string | null; role: string; created_at: number | null; snippet: string } | null;
+  if (!row) return null;
+  return {
+    kind: "conversation", score: 0, snippet: row.snippet ?? "", ref: row.id,
+    id: row.id, conversation_id: row.conversation_id, provider: row.provider,
+    title: row.title, role: row.role, created_at: row.created_at, date: row.created_at,
+  };
 }
 
 export function heading(hit: Hit): string {

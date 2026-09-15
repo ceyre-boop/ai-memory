@@ -37,7 +37,15 @@ export function run(
   // and the repo .env holds a real ANTHROPIC_API_KEY. Without this, a test
   // that reaches modelConfig() can silently pick up real credentials and
   // fire a real, billed model call instead of the mock it thinks it's using.
-  const spawnEnv: Record<string, string | undefined> = { ...process.env, AI_MEMORY_HOME: home, AI_MEMORY_KEY: KEY, AI_MEMORY_NO_DOTENV: "1", ANTHROPIC_API_KEY: "", ...env };
+  // AI_MEMORY_QUERY_CACHE: --more's pagination cache defaults to
+  // ~/.config/ai-memory/query-cache.json — a real path on the real machine.
+  // Without an override here, any test that runs ask.ts/contradictions.ts
+  // would silently write into it. Route it into the same disposable home
+  // every other piece of test state already uses.
+  const spawnEnv: Record<string, string | undefined> = {
+    ...process.env, AI_MEMORY_HOME: home, AI_MEMORY_KEY: KEY, AI_MEMORY_NO_DOTENV: "1", ANTHROPIC_API_KEY: "",
+    AI_MEMORY_QUERY_CACHE: join(home, "query-cache.json"), ...env,
+  };
   delete spawnEnv.CLAUDECODE;
   if (env.CLAUDECODE !== undefined) spawnEnv.CLAUDECODE = env.CLAUDECODE;
 

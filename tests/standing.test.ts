@@ -21,7 +21,7 @@ async function runCli(args: string[], env: Record<string, string> = {}) {
   // Tests simulate a person at a normal terminal, not an AI session issuing
   // the command — scrub CLAUDECODE so standing.ts's human-operator guard
   // doesn't fire for every test here. A dedicated test below re-adds it to prove the guard works.
-  const spawnEnv: Record<string, string | undefined> = { ...process.env, AI_MEMORY_HOME: HOME, AI_MEMORY_KEY: KEY, ANTHROPIC_API_KEY: "", AI_MEMORY_NO_DOTENV: "1", ...env };
+  const spawnEnv: Record<string, string | undefined> = { ...process.env, AI_MEMORY_HOME: HOME, AI_MEMORY_KEY: KEY, ANTHROPIC_API_KEY: "", AI_MEMORY_NO_DOTENV: "1", AI_MEMORY_QUERY_CACHE: join(HOME, "query-cache.json"), ...env };
   delete spawnEnv.CLAUDECODE;
   if (env.CLAUDECODE !== undefined) spawnEnv.CLAUDECODE = env.CLAUDECODE;
   const p = Bun.spawn({
@@ -97,8 +97,8 @@ const HITS: Hit[] = [
 test("buildStandingMessage numbers snippets with provenance; empty hits say so", () => {
   const m = buildStandingMessage("polishing the demo", HITS);
   expect(m).toContain("Topic: polishing the demo");
-  expect(m).toContain('[1] (claude · "Sprint retro notes" · user · 2026-04-10)\nthat was a mistake, I keep polishing instead of shipping');
-  expect(m).toContain('[2] (claude · "Standup notes" · user · 2026-02-01)\nrefactored the auth module');
+  expect(m).toContain('[1] (claude · "Sprint retro notes" · user · 2026-04-10 · ?)\nthat was a mistake, I keep polishing instead of shipping');
+  expect(m).toContain('[2] (claude · "Standup notes" · user · 2026-02-01 · ?)\nrefactored the auth module');
   expect(buildStandingMessage("x", [])).toContain("(no matching snippets in the record)");
   expect(STANDING_SYSTEM_PROMPT).toContain("NOTHING STANDING.");
   expect(STANDING_SYSTEM_PROMPT).toContain("standard must come from the snippet, never from you");

@@ -20,7 +20,9 @@ async function runAsk(args: string[], env: Record<string, string> = {}) {
   // Tests simulate a person at a normal terminal, not an AI session issuing
   // the command — scrub CLAUDECODE so ask.ts's human-operator guard doesn't
   // fire for every test here. A dedicated test below re-adds it to prove the guard works.
-  const spawnEnv: Record<string, string | undefined> = { ...process.env, AI_MEMORY_HOME: HOME, AI_MEMORY_KEY: KEY, ANTHROPIC_API_KEY: "", AI_MEMORY_NO_DOTENV: "1", ...env };
+  // AI_MEMORY_QUERY_CACHE isolated too — ask.ts's --more writes into it by
+  // default, and the real path is ~/.config/ai-memory/query-cache.json.
+  const spawnEnv: Record<string, string | undefined> = { ...process.env, AI_MEMORY_HOME: HOME, AI_MEMORY_KEY: KEY, ANTHROPIC_API_KEY: "", AI_MEMORY_NO_DOTENV: "1", AI_MEMORY_QUERY_CACHE: join(HOME, "query-cache.json"), ...env };
   delete spawnEnv.CLAUDECODE;
   if (env.CLAUDECODE !== undefined) spawnEnv.CLAUDECODE = env.CLAUDECODE;
   const p = Bun.spawn({
@@ -36,12 +38,26 @@ const MOCK_ENV = () => ({ AI_MEMORY_PROVIDER: "api", ANTHROPIC_API_KEY: "test-ke
 let FAKE_CLI: string;
 const CLI_ENV = () => ({ AI_MEMORY_PROVIDER: "claude-cli", AI_MEMORY_CLAUDE_BIN: FAKE_CLI });
 
-beforeAll(() => {
+beforeAll(async () => {
   HOME = mkdtempSync(join(tmpdir(), "ai-memory-ask-"));
   for (const p of ["chatgpt", "gemini"]) {
     const r = Bun.spawnSync({ cmd: ["bun", join(REPO, "scripts", "ingest.ts"), join(FIX, p)],
       env: { ...process.env, AI_MEMORY_HOME: HOME, AI_MEMORY_KEY: KEY }, stdout: "pipe", stderr: "pipe" });
     expect(r.exitCode).toBe(0);
+  }
+  // Five dated "gadget" messages, direct-inserted — controlled data for
+  // --more/--since/--until/--oldest/--newest/--chunk, independent of the
+  // ingested fixtures' own keyword content and message counts.
+  {
+    const { openStore } = await import("../scripts/lib/db");
+    const db = openStore({ path: join(HOME, "embeddings", "index.db"), key: KEY });
+    const insConv = db.prepare(`INSERT INTO conversations (id, provider, source_id, title, created_at, message_count, thread_inferred, imported_at) VALUES (?,?,?,?,?,?,?,?)`);
+    const insMsg = db.prepare(`INSERT INTO messages (id, conversation_id, seq, role, created_at, body, on_main_path, content_types) VALUES (?,?,?,?,?,?,?,?)`);
+    insConv.run("claude:gadgets", "claude", "gadgets", "Gadget planning", Date.parse("2026-01-01"), 5, 0, Date.now());
+    for (let i = 1; i <= 5; i++) {
+      insMsg.run(`claude:gadgets:${i}`, "claude:gadgets", i, "user", Date.parse(`2026-01-0${i}`), `Gadget note number ${i}`, 1, '["text"]');
+    }
+    db.close();
   }
   FAKE_CLI = join(HOME, "fake-claude");
   writeFileSync(FAKE_CLI, "#!/bin/sh\n# records args + stdin, answers like the CLI would\nprintf '%s\\n' \"$@\" > \"${0}.args\"\ninput=$(cat)\nprintf '%s' \"$input\" > \"${0}.stdin\"\ncase \"$*\" in *\"You rewrite a question\"*) printf '[\"sourdough starter\", \"ferment days\", \"cold kitchen\"]';; *) printf 'Five to seven days [1], longer in a cold kitchen [3].';; esac\n");
@@ -63,7 +79,9 @@ beforeAll(() => {
           ? 'PATTERN: forgetting the starter\nSAID: [1] noted forgetting to feed the starter as a recurring mistake\nNOW: same starter-care situation\n---'
           : "NOTHING STANDING.";
       }
-      else text = content.includes("altitude") ? "Not in your record." : "Let it ferment 5 to 7 days [1]; cold kitchens take longer [3].";
+      else if (content.includes("altitude")) text = "Not in your record.";
+      else if (content.includes("gadget")) text = content.includes("(this batch was cut off") ? "There are more, sir — [1] covers this batch." : "Gadget note [1].";
+      else text = "Let it ferment 5 to 7 days [1]; cold kitchens take longer [3].";
       return Response.json({ model: body.model, stop_reason: "end_turn", content: [{ type: "text", text }], usage: { input_tokens: 10, output_tokens: 5 } });
     },
   });
@@ -76,8 +94,8 @@ test("user message numbers snippets with provenance; empty hits say so; system p
     { kind: "file", path: "notes/bread.md", snippet: "feed twice", score: -0.5 },
   ]);
   expect(m).toContain("Question: how long?");
-  expect(m).toContain('[1] (chatgpt · "Sourdough" · assistant · 2024-06-10)\n5 to 7 days');
-  expect(m).toContain("[2] (file · notes/bread.md)\nfeed twice");
+  expect(m).toContain('[1] (chatgpt · "Sourdough" · assistant · 2024-06-10 · ?)\n5 to 7 days');
+  expect(m).toContain("[2] (file · notes/bread.md · ?)\nfeed twice");
   expect(buildUserMessage("x", [])).toContain("(no matching snippets in the record)");
   expect(SYSTEM_PROMPT).toContain('reply with exactly: "Not in your record."');
   expect(SYSTEM_PROMPT).toContain("Do not use general knowledge");
@@ -213,6 +231,86 @@ test("a failed standing-pattern call never breaks the main answer", async () => 
   expect(r.code).toBe(0);
   expect(r.out).toContain("Let it ferment 5 to 7 days [1]"); // main answer unaffected
   expect(r.out).not.toContain("Also standing in your record"); // pattern check failed silently, not fatally
+});
+
+// ── steerable retrieval: --more, --oldest/--newest, --since/--until, --chunk ──
+
+test("--dry shows the retrieved set and truncation state for --k below the real count", async () => {
+  const r = await runAsk(["gadget", "--dry", "--no-expand", "--k", "2", "--source", "conv"], MOCK_ENV());
+  expect(r.code).toBe(0);
+  expect(r.out).toContain("2 snippets retrieved");
+  expect(r.out).toContain("more available — run --more");
+  expect(r.out).toContain("── retrieved snippets ──");
+  expect(r.out).toContain("── user message ──");
+  expect(r.out).toContain("(this batch was cut off by --k; more matches exist — --more retrieves the next batch)");
+});
+
+test("--dry shows no truncation note when --k covers everything", async () => {
+  const r = await runAsk(["gadget", "--dry", "--no-expand", "--k", "10", "--source", "conv"], MOCK_ENV());
+  expect(r.code).toBe(0);
+  expect(r.out).toContain("5 snippets retrieved");
+  expect(r.out).not.toContain("more available");
+  expect(r.out).not.toContain("this batch was cut off");
+});
+
+test("--more excludes what --k already returned and pulls a genuinely disjoint next batch", async () => {
+  const before = calls.length;
+  const first = await runAsk(["gadget", "--no-expand", "--no-patterns", "--k", "2", "--source", "conv"], MOCK_ENV());
+  expect(first.code).toBe(0);
+  const firstRefs = [...first.out.matchAll(/claude:gadgets:\d/g)].map((m) => m[0]);
+  expect(firstRefs.length).toBeGreaterThan(0);
+
+  const more = await runAsk(["gadget", "--no-expand", "--no-patterns", "--k", "2", "--source", "conv", "--more"], MOCK_ENV());
+  expect(more.code).toBe(0);
+  expect(more.out).toContain("--more: excluded 2 already-shown snippet(s)");
+  const moreRefs = [...more.out.matchAll(/claude:gadgets:\d/g)].map((m) => m[0]);
+  expect(moreRefs.length).toBeGreaterThan(0);
+  expect(moreRefs.some((r) => firstRefs.includes(r))).toBe(false); // no overlap
+  expect(calls.length - before).toBe(2); // two answer calls, --no-patterns skips the extra one
+});
+
+test("--oldest and --newest reorder by date and are mutually exclusive", async () => {
+  const oldest = await runAsk(["gadget", "--dry", "--no-expand", "--k", "5", "--source", "conv", "--oldest"], MOCK_ENV());
+  expect(oldest.out.indexOf("Gadget note number 1")).toBeLessThan(oldest.out.indexOf("Gadget note number 5"));
+
+  const newest = await runAsk(["gadget", "--dry", "--no-expand", "--k", "5", "--source", "conv", "--newest"], MOCK_ENV());
+  expect(newest.out.indexOf("Gadget note number 5")).toBeLessThan(newest.out.indexOf("Gadget note number 1"));
+
+  const both = await runAsk(["gadget", "--dry", "--oldest", "--newest"], MOCK_ENV());
+  expect(both.code).not.toBe(0);
+  expect(both.err).toContain("mutually exclusive");
+});
+
+test("--since/--until bound the date window, composed together", async () => {
+  const r = await runAsk(["gadget", "--dry", "--no-expand", "--k", "10", "--source", "conv", "--since", "2026-01-02", "--until", "2026-01-04"], MOCK_ENV());
+  expect(r.code).toBe(0);
+  expect(r.out).toContain("3 snippets retrieved");
+  expect(r.out).toContain("Gadget note number 2");
+  expect(r.out).toContain("Gadget note number 3");
+  expect(r.out).toContain("Gadget note number 4");
+  expect(r.out).not.toContain("Gadget note number 1");
+  expect(r.out).not.toContain("Gadget note number 5");
+});
+
+test("a garbage --since value is a usage error, not a silent no-op", async () => {
+  const r = await runAsk(["gadget", "--dry", "--since", "not-a-date"], MOCK_ENV());
+  expect(r.code).not.toBe(0);
+  expect(r.err).toContain("--since needs a date");
+});
+
+test("--chunk fetches one exact snippet directly, skipping search entirely", async () => {
+  const dry = await runAsk(["anything", "--dry", "--chunk", "claude:gadgets:3"], MOCK_ENV());
+  expect(dry.code).toBe(0);
+  expect(dry.out).toContain("fetched directly by ref, no search");
+  expect(dry.out).toContain("1 snippets retrieved");
+  expect(dry.out).toContain("Gadget note number 3");
+  expect(dry.out).not.toContain("more available"); // a single directly-fetched snippet is never "truncated"
+});
+
+test("--chunk with an unknown ref is a clear error, not an empty answer", async () => {
+  const r = await runAsk(["anything", "--dry", "--chunk", "claude:gadgets:does-not-exist"], MOCK_ENV());
+  expect(r.code).not.toBe(0);
+  expect(r.err).toContain("no snippet found for --chunk");
 });
 
 test("outbound network code lives only in ask.ts (hosted) and embed.ts (loopback)", () => {

@@ -52,3 +52,9 @@ export function fmtDate(ms: number | null | undefined): string {
   if (!ms) return "—";
   return new Date(ms).toISOString().slice(0, 16).replace("T", " ");
 }
+
+/** Parses --since/--until values (YYYY-MM-DD, or anything Date.parse accepts). Returns null on garbage. */
+export function parseDateArg(value: string): number | null {
+  const ms = Date.parse(value);
+  return Number.isFinite(ms) ? ms : null;
+}

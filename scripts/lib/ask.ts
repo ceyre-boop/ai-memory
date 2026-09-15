@@ -56,7 +56,7 @@ export function modelConfig() {
   };
 }
 
-/** One retrieval hit, as produced by scripts/query.ts `search()`. */
+/** One retrieval hit, as produced by scripts/query.ts `search()`/`searchPage()`. */
 export interface Hit {
   kind: "conversation" | "file";
   id?: string;
@@ -68,6 +68,10 @@ export interface Hit {
   path?: string;
   snippet: string;
   score: number;
+  /** Stable identity — re-fetchable with query.ts's fetchByRef(). */
+  ref?: string;
+  /** General sort date (created_at for conversations, mtime for files). */
+  date?: number | null;
 }
 
 // Character contract (project brief): warm, state-aware, admits empty results
@@ -86,7 +90,8 @@ Hard rules:
 - Be warm and direct. Short paragraphs. No preamble, no headers, no bullet lists unless the user asked for a list.
 - You may disagree with the question's premise when the record contradicts it, and say so.
 - Other people named in the snippets are the user's contacts, not yours: repeat only what the record says about them, and where useful suggest the user talk to that person.
-- Say what you cannot see when it matters: you are reading search hits over a local store, not the whole history.`;
+- Say what you cannot see when it matters: you are reading search hits over a local store, not the whole history.
+- If the snippets are marked below as an incomplete batch, you may say there may be more and that --more retrieves the next one — but only when that marker is present. Never guess at completeness otherwise, and never state or estimate how many more there might be; the marker is a yes/no signal, not a count.`;
 
 export const EXPAND_PROMPT = `You rewrite a question into search keywords for a full-text index (FTS5, keyword matching, no semantics). Return a JSON array of exactly 3 short alternative phrasings (2–6 words each) that someone might have used when originally discussing this topic — synonyms, concrete nouns, likely jargon. No explanations, JSON array only.`;
 
@@ -96,15 +101,19 @@ function when(ms: number | null | undefined): string {
 
 export function describeHit(h: Hit): string {
   return h.kind === "conversation"
-    ? `${h.provider ?? "chat"} · "${h.title ?? "untitled"}" · ${h.role ?? "?"} · ${when(h.created_at)}`
-    : `file · ${h.path ?? "?"}`;
+    ? `${h.provider ?? "chat"} · "${h.title ?? "untitled"}" · ${h.role ?? "?"} · ${when(h.created_at)} · ${h.ref ?? "?"}`
+    : `file · ${h.path ?? "?"} · ${h.ref ?? "?"}`;
 }
 
-export function buildUserMessage(question: string, hits: Hit[]): string {
+/** Appended to the user message only when the batch was truncated — the one
+ *  signal the model gets about coverage, never a count. See CONSTRAINTS.md. */
+const TRUNCATED_NOTE = "\n\n(this batch was cut off by --k; more matches exist — --more retrieves the next batch)";
+
+export function buildUserMessage(question: string, hits: Hit[], truncated = false): string {
   if (!hits.length) return `Question: ${question}\n\n(no matching snippets in the record)`;
   const lines = hits.map((h, i) =>
     `[${i + 1}] (${describeHit(h)})\n${h.snippet.replace(/[«»]/g, "").replace(/\s+/g, " ").trim()}`);
-  return `Question: ${question}\n\nSnippets from the record:\n\n${lines.join("\n\n")}`;
+  return `Question: ${question}\n\nSnippets from the record:\n\n${lines.join("\n\n")}` + (truncated ? TRUNCATED_NOTE : "");
 }
 
 /** Snippet numbers the answer cites, in order of first appearance, 1-based, only those ≤ n. */
@@ -128,6 +137,24 @@ export function mergeHits(lists: Hit[][], limit: number): Hit[] {
     }
   }
   return [...seen.values()].sort((a, b) => a.score - b.score).slice(0, limit);
+}
+
+export interface HitPage {
+  hits: Hit[];
+  truncated: boolean;
+}
+
+/**
+ * Merges several searchPage() results (one per expansion term) the same way
+ * mergeHits() already does, plus the combined truncation signal: true when
+ * any individual term's page was itself truncated, or when the deduped pool
+ * across all terms already exceeded the limit before the final cut.
+ */
+export function mergeHitPages(pages: HitPage[], limit: number): HitPage {
+  const hits = mergeHits(pages.map((p) => p.hits), limit);
+  const pool = mergeHits(pages.map((p) => p.hits), Number.MAX_SAFE_INTEGER);
+  const truncated = pages.some((p) => p.truncated) || pool.length > limit;
+  return { hits, truncated };
 }
 
 /** Run one prompt through the claude CLI. No tools, no settings, no session file; stdin carries the user message. */
@@ -370,11 +397,11 @@ export async function findStandingPatterns(topic: string, hits: Hit[]): Promise<
   return { ...parsed, raw, model: data.model ?? cfg.model, snippets_sent: hits.length, usage: data.usage };
 }
 
-export async function ask(question: string, hits: Hit[]): Promise<AskResult> {
+export async function ask(question: string, hits: Hit[], truncated = false): Promise<AskResult> {
   const cfg = modelConfig();
   const data = await messages({
     model: cfg.model, max_tokens: 2048, system: SYSTEM_PROMPT,
-    messages: [{ role: "user", content: buildUserMessage(question, hits) }],
+    messages: [{ role: "user", content: buildUserMessage(question, hits, truncated) }],
   });
   if (data.stop_reason === "refusal") {
     return { answer: "The model declined to answer this one.", model: data.model ?? cfg.model, snippets_sent: hits.length, usage: data.usage, stop_reason: "refusal" };
