@@ -45,7 +45,9 @@ context and rent the model. This is memory infrastructure, nothing more.
   matching snippets to the model provider you configure — by default the `claude` CLI signed in to your
   own subscription, or the Messages API with `ANTHROPIC_API_KEY` (read from `.env`, never logged, never
   in output) when `AI_MEMORY_PROVIDER=api`. No provider → no call; `--dry` shows exactly what would be
-  sent and sends nothing.
+  sent and sends nothing. `ask` also checks the same retrieved snippets for a standing pattern by
+  default (same rule as `standing`, one more call on the snippets already in hand, `--no-patterns`
+  turns it off) — still one question, one act of asking, nothing delivered between questions.
   `contradictions` shares that same one file, same provider, same rule — it sends a topic plus the
   top-k snippets and nothing else, to find where your own record asserts one thing at two different
   times, not to judge which is true. `standing` shares it too — it looks for a topic you already named a
