@@ -102,4 +102,8 @@ Your conversations mention other people: colleagues, friends, family, public fig
   inside an AI coding session, the same `CLAUDECODE` check and the same `--dry` escape hatch as `push`.
   What gets swept in, and therefore what the assistant can ever recall, is decided by a person at a
   terminal here too.
+- Sending anything outbound is the same kind of act, again. `ask` and `contradictions` refuse to call
+  the model when run from inside an AI coding session, the same `CLAUDECODE` check and the same `--dry`
+  escape hatch as `push` and `collect`. What leaves the machine, and on whose say-so, is decided by a
+  person at a terminal — not by an agent asking on its own behalf.
 - Changing any rule on this page requires editing this page first, in its own commit.
