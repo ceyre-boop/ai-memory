@@ -48,7 +48,11 @@ context and rent the model. This is memory infrastructure, nothing more.
   sent and sends nothing.
   `contradictions` shares that same one file, same provider, same rule — it sends a topic plus the
   top-k snippets and nothing else, to find where your own record asserts one thing at two different
-  times, not to judge which is true. Never the passphrase, never the whole store. A test enforces that `scripts/lib/ask.ts` is the
+  times, not to judge which is true. `standing` shares it too — it looks for a topic you already named a
+  mistake, a rule, or a pattern in your own words, and refuses to flag anything unless the snippet itself
+  contains that self-characterization; the system never supplies the standard, only cites yours back. It
+  is pull-only: nothing in this codebase calls it on your behalf or on a schedule, you run it. Never the
+  passphrase, never the whole store. A test enforces that `scripts/lib/ask.ts` is the
   only outbound network code in the repository.
 - Never writes plaintext into `corpus/`. That folder is an inbox you control; the store is the
   encrypted database. `push` never copies `corpus/` to removable media.
@@ -102,8 +106,8 @@ Your conversations mention other people: colleagues, friends, family, public fig
   inside an AI coding session, the same `CLAUDECODE` check and the same `--dry` escape hatch as `push`.
   What gets swept in, and therefore what the assistant can ever recall, is decided by a person at a
   terminal here too.
-- Sending anything outbound is the same kind of act, again. `ask` and `contradictions` refuse to call
-  the model when run from inside an AI coding session, the same `CLAUDECODE` check and the same `--dry`
-  escape hatch as `push` and `collect`. What leaves the machine, and on whose say-so, is decided by a
-  person at a terminal — not by an agent asking on its own behalf.
+- Sending anything outbound is the same kind of act, again. `ask`, `contradictions`, and `standing`
+  refuse to call the model when run from inside an AI coding session, the same `CLAUDECODE` check and
+  the same `--dry` escape hatch as `push` and `collect`. What leaves the machine, and on whose say-so, is
+  decided by a person at a terminal — not by an agent asking on its own behalf.
 - Changing any rule on this page requires editing this page first, in its own commit.
