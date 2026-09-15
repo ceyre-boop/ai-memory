@@ -41,6 +41,21 @@ function sideLine(label: string, side: { n: number; hit: Hit }): string {
   return `  ${label} [${side.n}] ${where}\n      "${h.snippet.replace(/[«»]/g, "").replace(/\s+/g, " ").trim()}"`;
 }
 
+// CONSTRAINTS.md: sending anything outbound is a human act, same as push
+// and collect. Inside an AI coding session (CLAUDECODE set), every real
+// call is refused; --dry still works so the assistant can show what it
+// *would* send, never send it.
+function requireHumanOperator(dry: boolean): void {
+  if (dry) return;
+  if (process.env.CLAUDECODE) {
+    throw new StoreError(
+      "refusing to send your topic to the model from inside an AI coding session (CLAUDECODE is set) — " +
+      "sending anything outbound is a human act here. Run this command yourself in a normal terminal. " +
+      "--dry still works from here.",
+    );
+  }
+}
+
 async function main() {
   let args;
   try {
@@ -55,6 +70,7 @@ async function main() {
   const source = (args.opts.get("source") ?? "conv") as Source;
   if (!["all", "conv", "files"].includes(source)) usage("--source must be all, conv, or files");
   const DRY = args.flags.has("dry");
+  requireHumanOperator(DRY);
   const EXPAND = !args.flags.has("no-expand") && !DRY;
 
   const cfg = modelConfig();

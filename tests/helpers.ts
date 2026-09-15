@@ -31,7 +31,13 @@ export function run(
   // Tests simulate a person at a normal terminal, not an AI session issuing the
   // command — scrub CLAUDECODE so push.ts's human-operator guard doesn't fire
   // for every test. A dedicated test in audit.test.ts re-adds it to prove the guard works.
-  const spawnEnv: Record<string, string | undefined> = { ...process.env, AI_MEMORY_HOME: home, AI_MEMORY_KEY: KEY, ...env };
+  //
+  // Also never let a script under test load the repo's real .env: ask.ts and
+  // contradictions.ts call modelConfig(), which loads it unless told not to,
+  // and the repo .env holds a real ANTHROPIC_API_KEY. Without this, a test
+  // that reaches modelConfig() can silently pick up real credentials and
+  // fire a real, billed model call instead of the mock it thinks it's using.
+  const spawnEnv: Record<string, string | undefined> = { ...process.env, AI_MEMORY_HOME: home, AI_MEMORY_KEY: KEY, AI_MEMORY_NO_DOTENV: "1", ANTHROPIC_API_KEY: "", ...env };
   delete spawnEnv.CLAUDECODE;
   if (env.CLAUDECODE !== undefined) spawnEnv.CLAUDECODE = env.CLAUDECODE;
 

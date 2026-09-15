@@ -180,6 +180,50 @@ test("collect refuses to write to the store from inside an AI session (CLAUDECOD
   } finally { cleanup(home); rmSync(source, { recursive: true, force: true }); }
 });
 
+test("ask refuses to call the model from inside an AI session (CLAUDECODE set); --dry still works", () => {
+  const home = makeHome();
+  try {
+    expect(run("ingest.ts", [join(FIX, "claude")], { AI_MEMORY_HOME: home }).code).toBe(0);
+
+    // simulate running from inside an AI coding session
+    const dry = run("ask.ts", ["a question", "--dry", "--no-expand"], { AI_MEMORY_HOME: home, CLAUDECODE: "1" });
+    expect(dry.code).toBe(0);
+
+    const real = run("ask.ts", ["a question", "--no-expand"], { AI_MEMORY_HOME: home, CLAUDECODE: "1" });
+    expect(real.code).not.toBe(0);
+    expect(real.stderr).toContain("refusing to send your question to the model from inside an AI coding session");
+
+    // the same command, run as if from a normal terminal, reaches the next
+    // check instead (no model configured) — proof the guard did not fire
+    const human = run("ask.ts", ["a question", "--no-expand"], { AI_MEMORY_HOME: home, AI_MEMORY_PROVIDER: "api" });
+    expect(human.code).not.toBe(0);
+    expect(human.stderr).toContain("no model configured");
+    expect(human.stderr).not.toContain("AI coding session");
+  } finally { cleanup(home); }
+});
+
+test("contradictions refuses to call the model from inside an AI session (CLAUDECODE set); --dry still works", () => {
+  const home = makeHome();
+  try {
+    expect(run("ingest.ts", [join(FIX, "claude")], { AI_MEMORY_HOME: home }).code).toBe(0);
+
+    // simulate running from inside an AI coding session
+    const dry = run("contradictions.ts", ["a topic", "--dry", "--no-expand"], { AI_MEMORY_HOME: home, CLAUDECODE: "1" });
+    expect(dry.code).toBe(0);
+
+    const real = run("contradictions.ts", ["a topic", "--no-expand"], { AI_MEMORY_HOME: home, CLAUDECODE: "1" });
+    expect(real.code).not.toBe(0);
+    expect(real.stderr).toContain("refusing to send your topic to the model from inside an AI coding session");
+
+    // the same command, run as if from a normal terminal, reaches the next
+    // check instead (no model configured) — proof the guard did not fire
+    const human = run("contradictions.ts", ["a topic", "--no-expand"], { AI_MEMORY_HOME: home, AI_MEMORY_PROVIDER: "api" });
+    expect(human.code).not.toBe(0);
+    expect(human.stderr).toContain("no model configured");
+    expect(human.stderr).not.toContain("AI coding session");
+  } finally { cleanup(home); }
+});
+
 test("push --eject: CLAUDECODE guard refuses a real eject, allows --dry; --pull+--eject is rejected", () => {
   const home = makeHome();
   const target = mkdtempSync(join(tmpdir(), "ai-memory-eject-guard-"));

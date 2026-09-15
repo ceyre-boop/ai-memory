@@ -17,9 +17,15 @@ const calls: any[] = [];
 // Async on purpose: the mock model endpoint runs in this test process, so a
 // synchronous spawn would block the event loop and the CLI could never get a reply.
 async function runAsk(args: string[], env: Record<string, string> = {}) {
+  // Tests simulate a person at a normal terminal, not an AI session issuing
+  // the command — scrub CLAUDECODE so ask.ts's human-operator guard doesn't
+  // fire for every test here. A dedicated test below re-adds it to prove the guard works.
+  const spawnEnv: Record<string, string | undefined> = { ...process.env, AI_MEMORY_HOME: HOME, AI_MEMORY_KEY: KEY, ANTHROPIC_API_KEY: "", AI_MEMORY_NO_DOTENV: "1", ...env };
+  delete spawnEnv.CLAUDECODE;
+  if (env.CLAUDECODE !== undefined) spawnEnv.CLAUDECODE = env.CLAUDECODE;
   const p = Bun.spawn({
     cmd: ["bun", join(REPO, "scripts", "ask.ts"), ...args],
-    env: { ...process.env, AI_MEMORY_HOME: HOME, AI_MEMORY_KEY: KEY, ANTHROPIC_API_KEY: "", AI_MEMORY_NO_DOTENV: "1", ...env },
+    env: spawnEnv,
     stdout: "pipe", stderr: "pipe", stdin: "ignore", cwd: HOME, // never the repo .env: tests must not reach the real API
   });
   const [out, err, code] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited]);
