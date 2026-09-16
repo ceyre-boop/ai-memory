@@ -16,6 +16,13 @@ Read-only operations over the corpus. No approval, no cost, no state change.
 - Constraint violations: flagging when a proposed action conflicts with `CONSTRAINTS.md`
 - Recurrence counts: "you have asked a version of this N times"
 
+**Amended 2026-09-16, by the operator, accepted as worded.** A scheduled run may *prepare* a
+standing review and write it to a file. It may not rank, prioritize, notify, or interrupt. The
+operator reads it by choosing to. This is the one narrow exception to "pull by the operator": the
+*timing* of preparation may be a schedule, but the *content* still carries no standard the record
+didn't already state, and nothing about its delivery crosses into Tier 2 or Tier 3 — no ranking of
+what matters, no notification, no interruption. `review.ts --out <path>` is the implementation.
+
 ## Tier 2 — Proposes, operator approves
 
 Anything that costs money, changes state, or leaves the machine.
