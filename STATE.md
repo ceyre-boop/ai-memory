@@ -21,7 +21,7 @@ the proactive layer does not exist and is governance-blocked by design.
 |---|---|---|
 | **1. Recall** — retrieve, cite, decline honestly | **Done.** Verified end to end, survives chip round-trip, reopens on other hardware. | store + all scripts |
 | **2. Pattern** — flags standing patterns from the operator's own prior words | **Partial.** `standing.ts`, `review.ts`, and the standing check folded into `ask`. Pull-only: it answers when run, never on its own. | `standing.ts`, `review.ts`, `lib/ask.ts` |
-| **3. Proactive** — surfaces without being asked | **Does not exist.** Blocked by GOVERNANCE.md, deliberately. See "Open decision". | — |
+| **3. Proactive** — surfaces without being asked | **Narrowly unblocked.** A scheduled run may prepare a file; it may not notify or interrupt. Still pull at the delivery end — the operator opens the file. See "Open decision" and "Scheduling". | `review.ts`, launchd job |
 
 ## On this computer vs only on the chip
 
@@ -68,20 +68,43 @@ Stated as the operator stated it, so a future session does not soften it:
 Every one of those is *proactive*. Everything built so far is *pull* — it answers
 when run. That is the whole remaining gap, and it is one component, not a rewrite.
 
-## Open decision — the operator's, not a session's
+## Open decision — resolved 2026-09-16
 
-GOVERNANCE.md Tier 1 says standing flags are "pull-only: run by the operator, never
-delivered on the system's own initiative," and Tier 3 forbids "deciding what matters
-or what is urgent." A scheduler crosses both.
-
-The narrowest amendment that would unblock layer 3 without gutting the boundary:
+The operator accepted the amendment as worded, in GOVERNANCE.md, in its own commit:
 
 > A scheduled run may **prepare** a standing review and write it to a file. It may
 > not rank, prioritize, notify, or interrupt. The operator reads it by choosing to.
 
-That keeps "what matters" with the operator: the system prepares material, the
-person decides what is important. **Not yet accepted.** Do not implement a scheduler
-until this page and GOVERNANCE.md both say it is allowed, in a commit of its own.
+`review.ts --out <path>` already satisfies this exactly as it stood before the
+amendment — it was written Tier-1-clean from the start (topics come from the record's
+own timestamps, every flag cites the operator's own words, no ranking). The only thing
+the amendment actually unblocks is *running it on a schedule* rather than only by hand;
+`requireHumanOperator()`'s `CLAUDECODE` guard only blocks an AI coding session, never a
+scheduler, so nothing there needed to change either. See "Scheduling" below.
+
+## Scheduling
+
+The one scheduled thing in this codebase: `launchd/com.ai-memory.review.plist`
+(macOS launchd), installed at `~/Library/LaunchAgents/com.ai-memory.review.plist`, runs
+`scripts/scheduled-review.sh` daily at 08:00. That wrapper sets `PATH` explicitly (launchd's
+own environment doesn't have `bun`/`claude` in it) and calls `bun scripts/review.ts --out
+<dated file>` — nothing more. Output lands in `reviews/` (gitignored: it quotes the
+operator's own record and must never reach the public repo).
+
+Install/reinstall after editing the plist:
+```sh
+cp launchd/com.ai-memory.review.plist ~/Library/LaunchAgents/
+launchctl bootout gui/$(id -u)/com.ai-memory.review 2>/dev/null   # if already loaded
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.ai-memory.review.plist
+```
+Test without waiting for 08:00: `launchctl kickstart -p gui/$(id -u)/com.ai-memory.review`,
+then check `reviews/launchd.log` and the newest file in `reviews/`.
+
+`review.ts`'s own `requireHumanOperator()` guard only blocks an *AI coding session*
+(`CLAUDECODE` set) — launchd never sets that, so the schedule was never blocked by it and
+nothing needed to change there. The thing the 2026-09-16 amendment actually authorized was
+running this outside a human typing the command at all; the content and citation discipline
+were already correct.
 
 ## Rules a fresh session must not rediscover the hard way
 
