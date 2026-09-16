@@ -130,9 +130,10 @@ async function main() {
       lines.push(`── ${new Date(r.last).toISOString().slice(0, 10)}  ${r.topic}`);
       if (r.patterns.length === 0) { lines.push("   nothing standing\n"); continue; }
       for (const p of r.patterns) {
-        lines.push(`   ⚑ ${p.pattern ?? p.summary ?? "(unlabelled)"}`);
-        if (p.quote) lines.push(`     your words: "${String(p.quote).slice(0, 220)}"`);
-        if (p.where) lines.push(`     ${p.where}`);
+        // StandingPattern shape (scripts/lib/ask.ts): { name, now, said: { n, hit } }
+        lines.push(`   ⚑ ${p.name ?? "(unlabelled)"}`);
+        if (p.said?.hit?.snippet) lines.push(`     your words: "${String(p.said.hit.snippet).replace(/[«»]/g, "").replace(/\s+/g, " ").trim().slice(0, 220)}"`);
+        if (p.now) lines.push(`     ${p.now}`);
       }
       lines.push("");
     }

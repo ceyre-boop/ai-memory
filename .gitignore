@@ -10,3 +10,5 @@ node_modules/
 .DS_Store
 # parked work (not tracked)
 wip/
+# scheduled standing-review output — quotes from the operator's own record
+reviews/
