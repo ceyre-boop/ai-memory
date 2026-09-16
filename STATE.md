@@ -93,3 +93,11 @@ until this page and GOVERNANCE.md both say it is allowed, in a commit of its own
 - Embedding is local-only over loopback. `lib/ask.ts` and `lib/embed.ts` are the only
   files permitted to open a socket, and a test enforces it.
 - The chip is written by a human at a terminal. Always.
+- The `--more` pagination cache (`~/.config/ai-memory/query-cache.json` by default) is
+  local, non-secret, and outside the repo — but early in that work it got written to
+  for real during a test run, before `AI_MEMORY_QUERY_CACHE` was isolated in every test
+  helper. It held fixture refs, nothing sensitive, and was deleted. The fix (tests now
+  always override `AI_MEMORY_QUERY_CACHE`, and the cache module resolves its path lazily
+  per call rather than freezing it at import time) is in place and tested. If a future
+  session adds a new tool that touches this cache, isolate it in tests the same way —
+  this exact mistake is cheap to repeat and easy to miss.
