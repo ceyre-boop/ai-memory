@@ -158,6 +158,9 @@ export async function embedTexts(
 /** One probe call, so callers can fail fast with a clear message. */
 export async function probeEmbedder(opts: EmbedOpts = {}): Promise<{ model: string; dim: number }> {
   const model = opts.model ?? embedModel();
-  const v = await embedOne("probe", { ...opts, model, timeoutMs: opts.timeoutMs ?? 15_000 });
+  // Cold start loads the model into memory and can take well over a minute on
+  // first call; a short probe timeout reads that as "embedder down" and kills
+  // an otherwise healthy multi-hour run.
+  const v = await embedOne("probe", { ...opts, model, timeoutMs: opts.timeoutMs ?? 180_000 });
   return { model, dim: v.length };
 }
