@@ -12,3 +12,4 @@ node_modules/
 wip/
 # scheduled standing-review output — quotes from the operator's own record
 reviews/
+embed.log
