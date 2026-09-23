@@ -48,11 +48,16 @@ partial backup, it is a snapshot.
 `bun scripts/embed.ts --kind file` — building vectors for 907,698 file chunks at
 ~13/s against local Ollama. **~838k remain, roughly 18 hours of wall clock.**
 
-**It has died unattended three times** with no error in the log, which points at an
-external kill (sleep, session teardown) rather than a crash. It is resumable by
-design: rerun the same command and it embeds only what is missing. Always check
-`pgrep -f scripts/embed.ts` before assuming it is still going, and never run two
-copies — two writers on one SQLite store dropped throughput from 13/s to 5/s.
+**Root cause of the repeated deaths, found 2026-09-22 — two bugs, not one:**
+
+1. **Ollama was not running.** `embed.ts` dies when the embedder vanishes, and
+   nothing kept ollama up. Fixed with `brew services start ollama`.
+2. **The probe timeout was 15s.** Ollama's cold model load exceeds that, so a healthy
+   embedder read as a dead one and the job exited. Raised to 180s.
+
+Now supervised by launchd (`bun ops/embed-agent.ts status`). KeepAlive is
+SuccessfulExit=false: restarts when killed, stops for good when embedding finishes.
+Never run two copies — two writers on one SQLite store dropped throughput 13/s → 5/s.
 
 When it finishes: store grows to ~2.9 GB, re-push, then the chip has full semantic
 search over files too.

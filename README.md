@@ -125,6 +125,7 @@ the Messages API instead, set `AI_MEMORY_PROVIDER=api` and put `ANTHROPIC_API_KE
 | `bun scripts/encrypt.ts migrate\|rekey\|check [--dry]` | Migrate a plaintext index to SQLCipher, change the passphrase, or report the state. |
 | `bun scripts/forget.ts <conversation-id> \| --provider X [--dry]` | Delete conversations and their search entries together. |
 | `bun scripts/status.ts` | Encryption state, row counts, recorded pushes. |
+| `bun ops/embed-agent.ts install\|uninstall\|status [--dry]` | launchd agent that keeps `embed` running across sleep, logout, and reboot. Restarts when killed, stops for good when embedding completes. Paths derived at run time. Requires `brew services start ollama`. |
 | `bun scripts/push.ts /Volumes/CHIP [--dry] [--pull] [--eject]` | Copy the store to media and verify it there. Refuses plaintext; never carries secrets. `--eject`: checkpoint + reopen-clean the store if it lives on that volume, then diskutil-eject — refuses to declare success if the checkpoint doesn't verify. |
 | `bun scripts/serve.ts [--port 3131]` | Loopback display and read-only JSON API over the store (`ui/`). |
 
