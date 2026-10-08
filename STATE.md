@@ -21,6 +21,7 @@ the proactive layer does not exist and is governance-blocked by design.
 |---|---|---|
 | **1. Recall** — retrieve, cite, decline honestly | **Done.** Verified end to end, survives chip round-trip, reopens on other hardware. | store + all scripts |
 | **2. Pattern** — flags standing patterns from the operator's own prior words | **Partial.** `standing.ts`, `review.ts`, and the standing check folded into `ask`. Pull-only: it answers when run, never on its own. | `standing.ts`, `review.ts`, `lib/ask.ts` |
+| **2b. Rules** — matches input against rules the operator wrote by hand, prints their own words | **Done 2026-10-08.** `reflex.ts`. No model, no socket, no write, no `CLAUDECODE` guard — the one pattern tool an AI session may run for real. Rules file is outside the repo (`~/.config/ai-memory/rules.md`, example in `docs/rules.example.md`). | `reflex.ts` |
 | **3. Proactive** — surfaces without being asked | **Narrowly unblocked.** A scheduled run may prepare a file; it may not notify or interrupt. Still pull at the delivery end — the operator opens the file. See "Open decision" and "Scheduling". | `review.ts`, launchd job |
 
 ## On this computer vs only on the chip

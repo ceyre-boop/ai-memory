@@ -28,7 +28,7 @@ want it flattered.
 
 ## Before claiming anything works
 
-Run it and paste the real output. `bun test` is the gate (currently 143 passing). For the
+Run it and paste the real output. `bun test` is the gate (currently 154 passing). For the
 embed job, check `pgrep -f scripts/embed.ts` before assuming it is still running — it has
 died unattended several times, and never run two copies against one store.
 

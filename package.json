@@ -12,6 +12,7 @@
     "forget": "bun scripts/forget.ts",
     "status": "bun scripts/status.ts",
     "test": "bun test",
-    "embed": "bun scripts/embed.ts"
+    "embed": "bun scripts/embed.ts",
+    "reflex": "bun scripts/reflex.ts"
   }
 }
