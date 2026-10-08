@@ -15,6 +15,14 @@ Read-only operations over the corpus. No approval, no cost, no state change.
   instead of facts. Pull-only: run by the operator, never delivered on the system's own initiative.
 - Constraint violations: flagging when a proposed action conflicts with `CONSTRAINTS.md`
 - Recurrence counts: "you have asked a version of this N times"
+- Hand-written rule matches (`reflex`) — **amended 2026-10-08.** The operator keeps a plain file of
+  rules in their own words; `reflex` matches input text against them by substring or regex and prints
+  the matching rule's quote, verifying any cited chunk ref against the store. The standard comes from
+  a file the operator typed, not from a retrieved snippet and not from a model — the system never
+  authors, edits, or suggests a rule. No model, no socket, no write, no ranking, no schedule. Because
+  nothing leaves the machine, it carries no `CLAUDECODE` guard: an AI coding session may run it for
+  real, which is the point — the operator's standing rules reach the session without the session
+  asking anyone anything. See `CONSTRAINTS.md` item 9.
 
 **Amended 2026-09-16, by the operator, accepted as worded.** A scheduled run may *prepare* a
 standing review and write it to a file. It may not rank, prioritize, notify, or interrupt. The

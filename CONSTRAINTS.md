@@ -125,3 +125,35 @@ Your conversations mention other people: colleagues, friends, family, public fig
   note there is printed by the CLI itself, deterministically, so `NO CONTRADICTIONS FOUND.` stays exactly
   that literal string and nothing riskier gets asked of the parser.
 - Changing any rule on this page requires editing this page first, in its own commit.
+
+## Rules you wrote yourself (`reflex`) — amended 2026-10-08
+
+A fourth kind of pull, and the first one with no model in it at all.
+
+9. **Matches your input against rules you wrote by hand, and prints your own words back.**
+   `reflex "text"` reads a plain markdown file of rules the operator authored
+   (`~/.config/ai-memory/rules.md` by default, `AI_MEMORY_RULES` to override — same convention as the
+   passphrase file: outside the repo, never rides a push). Each rule is a heading, a `match:` line of
+   plain words or `/regexes/`, an optional `ref:` pointing at one stable chunk ref the `query` tool
+   printed, and a quoted line in the operator's own words. When the input contains a match term, the
+   rule's quote is printed. That is the whole mechanism: substring and regex, deterministic, offline.
+
+What this adds, and what it does not:
+
+- **No model, no socket, no key required.** It is plain string matching. It therefore has no
+  `CLAUDECODE` guard — nothing leaves the machine and nothing is written, so it is the one
+  pattern-layer tool an AI coding session may run for real. That is deliberate: it lets the record's
+  standing rules reach a session without the session ever sending anything out.
+- **The system never writes, edits, infers, or suggests a rule.** `reflex` opens the rules file
+  read-only. Every rule exists because a person typed it. If the file is missing, it says so and
+  matches nothing.
+- **A `ref:` is verified, never trusted.** When a rule names a ref and the store is unlocked, the
+  ref is fetched with `fetchByRef` and the quote is checked to appear in that chunk. A rule whose ref
+  does not resolve, or whose quote is not in the chunk, is printed as **unverified** — still shown,
+  because the words are the operator's own, but marked, so a drifted quote never passes as record.
+- **Output is ordered by the rule file's own order, never ranked.** No scoring, no "most important",
+  no counts beyond the matched rules themselves.
+- **Pull-only, like everything else here.** Nothing calls it on a schedule. It runs when the
+  operator, or a session the operator is in, runs it. It never notifies.
+- It is not a mind, a reflex arc, or a judgment. It is `grep` over a file you wrote, printing lines
+  you wrote. The name says only that it fires without thinking.
