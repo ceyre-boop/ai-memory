@@ -191,3 +191,34 @@ What this adds, and what it does not:
   operator, or a session the operator is in, runs it. It never notifies.
 - It is not a mind, a reflex arc, or a judgment. It is `grep` over a file you wrote, printing lines
   you wrote. The name says only that it fires without thinking.
+
+## Ghostwriting — drafting as me — amended 2026-10-14
+
+A fifth kind of pull, and the first that produces new prose rather than returning old words.
+
+10. **Drafts in the operator's own mind and voice, from the operator's own material.**
+   `ghostwrite "topic"` assembles two things the operator already owns — `SOUL.md`, a distillation of
+   how the operator thinks and writes (itself built only from the operator's own corpus, every pattern
+   pinned to a quote, the same discipline as `reflex`: the standard is the operator's, never the
+   system's) and the top-k snippets `search` retrieves from the store — and sends them, with the topic,
+   to the model through the one outbound path (`lib/ask.ts`). It returns a draft.
+
+What it is bound by:
+
+- **Same outbound discipline as `ask`.** It is the single hosted call, reused — no new network code, a
+  test still enforces that `lib/ask.ts` and `lib/embed.ts` are the only files that may open a socket.
+  Never the passphrase, never the whole store — only `SOUL.md` and the retrieved snippets leave. `--dry`
+  prints exactly what would be sent and sends nothing. Like `ask`, `contradictions`, and `standing`, it
+  refuses the real call inside an AI coding session (`CLAUDECODE` set); what leaves the machine is
+  decided by a person at a terminal.
+- **It drafts; it never delivers.** The output is a draft handed to the operator, nothing more. It does
+  not send, post, publish, sign, or present itself as the operator to any person or system — that stays
+  Tier 3 under `GOVERNANCE.md`, unchanged. A ghostwriter hands you pages; you decide what becomes of them.
+- **It never invents a belief.** It writes from what `SOUL.md` records and what the store returns. Where
+  the record is silent and `SOUL.md` predicts no clear stance, it writes the open question the operator
+  would ask rather than manufacturing a position — surfacing the unsettled thing is itself one of the
+  operator's documented moves. It must not put a conviction in the operator's mouth that the record does
+  not support.
+- **`SOUL.md` is the operator's own record, distilled — not a mind.** It predicts moves from evidence; it
+  can be wrong or stale, and it carries no claim of sentience or agency. It is a profile built from the
+  operator's writing, kept out of the public repo the same way `reviews/` is.

@@ -48,6 +48,13 @@ Anything that costs money, changes state, or leaves the machine.
   autonomous capability and no proactive delivery — the operator still opens the page by choosing to.
   See `CONSTRAINTS.md`, "The display, and reaching it from another device".
 
+- Ghostwriting a draft (`ghostwrite`) — **amended 2026-10-14.** Sends `SOUL.md` (the operator's own
+  distilled profile, built only from their writing) plus retrieved snippets to the model through the
+  single `ask` path, and returns a draft for the operator. Outbound, so Tier 2 and a human act
+  (`CLAUDECODE`-guarded; `--dry` sends nothing). It only ever returns a draft — it never sends, posts,
+  or signs as the operator, which stays Tier 3 below. It writes from the record and `SOUL.md`, never a
+  belief the record does not support. See `CONSTRAINTS.md` item 10.
+
 **Standing approval, one exception.** JARVIS's `/api/chat` (`server.ts`) is the product's main path:
 every message the operator sends is itself the approval for the outbound call that answers it — there
 is no separate confirmation step, and gating one behind the other would break the thing being demoed.
