@@ -128,7 +128,8 @@ the Messages API instead, set `AI_MEMORY_PROVIDER=api` and put `ANTHROPIC_API_KE
 | `bun ops/embed-agent.ts install\|uninstall\|status [--dry]` | launchd agent that keeps `embed` running across sleep, logout, and reboot. Restarts when killed, stops for good when embedding completes. Paths derived at run time. Requires `brew services start ollama`. |
 | `bun scripts/push.ts /Volumes/CHIP [--dry] [--pull] [--eject]` | Copy the store to media and verify it there. Refuses plaintext; never carries secrets. `--eject`: checkpoint + reopen-clean the store if it lives on that volume, then diskutil-eject — refuses to declare success if the checkpoint doesn't verify. |
 | `bun scripts/serve.ts [--port 3131]` | Loopback display and read-only JSON API over the store (`ui/`). |
-| `bash ops/remote.sh` (or `bun run remote`) | Reach that same display from another device through a Cloudflare tunnel. Server still binds `127.0.0.1`; `/api` is gated by `AI_MEMORY_WEB_TOKEN`; the store and passphrase never leave this machine. A human act — refuses inside an AI coding session. Needs `cloudflared`. |
+| `bash ops/remote.sh` (or `bun run remote`) | Reach that same display from another device through a Cloudflare **quick** tunnel (random URL, up only while running). Server still binds `127.0.0.1`; `/api` is gated by `AI_MEMORY_WEB_TOKEN`; the store and passphrase never leave this machine. A human act — refuses inside an AI coding session. Needs `cloudflared`. |
+| `bash ops/tunnel.sh setup memory.<domain>` then `bun run tunnel` | Same, but a **named** tunnel with a **stable** URL you can bookmark. One-time `cloudflared tunnel login` + `setup`; then `run` each time. `ops/tunnel.sh access` adds Google-login gating (Cloudflare Access). `install-service` keeps it up across reboots. Human act — refuses inside an AI coding session. |
 
 `--dry` prints the plan and writes nothing. Every bulk or destructive command has it.
 

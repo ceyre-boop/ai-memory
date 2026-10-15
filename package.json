@@ -9,6 +9,7 @@
     "ingest": "bun scripts/ingest.ts",
     "serve": "bun scripts/serve.ts",
     "remote": "bash ops/remote.sh",
+    "tunnel": "bash ops/tunnel.sh run",
     "encrypt": "bun scripts/encrypt.ts",
     "forget": "bun scripts/forget.ts",
     "status": "bun scripts/status.ts",
