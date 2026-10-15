@@ -27,7 +27,8 @@ beforeAll(async () => {
   base = `http://127.0.0.1:${port}`;
   proc = Bun.spawn({
     cmd: ["bun", join(REPO, "scripts", "serve.ts"), "--port", String(port)],
-    env: { ...process.env, AI_MEMORY_HOME: HOME, AI_MEMORY_KEY: KEY },
+    // AI_MEMORY_WEB_TOKEN blanked so the default server is ungated regardless of env.
+    env: { ...process.env, AI_MEMORY_HOME: HOME, AI_MEMORY_KEY: KEY, AI_MEMORY_WEB_TOKEN: "" },
     stdout: "pipe", stderr: "pipe", stdin: "ignore",
     cwd: REPO,
   });
@@ -99,4 +100,42 @@ test("static ui is served; other paths 404; writes refused", async () => {
 test("no CORS wildcard on responses", async () => {
   const r = await fetch(base + "/api/telemetry");
   expect(r.headers.get("access-control-allow-origin")).toBeNull();
+});
+
+test("--remote gates /api behind a bearer token; static stays open", async () => {
+  const TOKEN = "serve-remote-token-abc123";
+  const port = 4900 + Math.floor(Math.random() * 900);
+  const b = `http://127.0.0.1:${port}`;
+  const p = Bun.spawn({
+    cmd: ["bun", join(REPO, "scripts", "serve.ts"), "--remote", "--port", String(port)],
+    env: { ...process.env, AI_MEMORY_HOME: HOME, AI_MEMORY_KEY: KEY, AI_MEMORY_WEB_TOKEN: TOKEN },
+    stdout: "pipe", stderr: "pipe", stdin: "ignore", cwd: REPO,
+  });
+  try {
+    for (let i = 0; i < 50; i++) {
+      try { if ((await fetch(b + "/")).ok) break; } catch {}
+      await Bun.sleep(100);
+    }
+    // the page itself loads with no token, so the browser can ask for one
+    expect((await fetch(b + "/")).status).toBe(200);
+    // /api is refused without a token, and with a wrong one
+    expect((await fetch(b + "/api/telemetry")).status).toBe(401);
+    expect((await fetch(b + "/api/telemetry", { headers: { authorization: "Bearer wrong" } })).status).toBe(401);
+    // and allowed with the right one
+    const ok = await fetch(b + "/api/telemetry", { headers: { authorization: "Bearer " + TOKEN } });
+    expect(ok.status).toBe(200);
+    expect((await ok.json()).status).toBe("ONLINE");
+  } finally {
+    p.kill();
+  }
+});
+
+test("--remote without a token refuses to start", () => {
+  const r = Bun.spawnSync({
+    cmd: ["bun", join(REPO, "scripts", "serve.ts"), "--remote", "--port", "4999"],
+    env: { ...process.env, AI_MEMORY_HOME: HOME, AI_MEMORY_KEY: KEY, AI_MEMORY_WEB_TOKEN: "" },
+    stdout: "pipe", stderr: "pipe", stdin: "ignore", cwd: REPO,
+  });
+  expect(r.exitCode).not.toBe(0);
+  expect(r.stderr.toString()).toContain("AI_MEMORY_WEB_TOKEN");
 });

@@ -9,15 +9,21 @@
 // record or say "no matches". Nothing here fetches or generates anything.
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { timingSafeEqual } from "node:crypto";
 import { openStore, counts, fail, ROOT, DB_PATH, readMeta } from "./lib/db";
 import { parseArgs, usage } from "./lib/cli";
 import type { Database } from "bun:sqlite";
 
 const USAGE = `
-usage: bun scripts/serve.ts [--port 3131] [--key-file <path>]
+usage: bun scripts/serve.ts [--port 3131] [--key-file <path>] [--remote]
 
   Serves ui/ and a read-only JSON API over the store on http://127.0.0.1:<port>.
   Needs the passphrase (AI_MEMORY_KEY, --key-file, or prompt).
+
+  --remote  Gate every /api request behind a bearer token so the loopback port
+            can be exposed through a tunnel (see ops/remote.sh). Requires
+            AI_MEMORY_WEB_TOKEN; refuses to start without it. The server still
+            binds 127.0.0.1 — the tunnel, not the server, does the exposing.
 `;
 
 const UI_DIR = fileURLToPath(new URL("../ui", import.meta.url));
@@ -97,12 +103,29 @@ export function buildApi(db: Database) {
   };
 }
 
-export function makeFetch(api: ReturnType<typeof buildApi>) {
+/** Constant-time bearer-token check. No token configured → every request passes
+ *  (plain loopback mode). A token configured → /api requires `Authorization:
+ *  Bearer <token>`; static files are always served so the page can ask for it. */
+export function makeAuthed(token: string) {
+  const want = Buffer.from(token);
+  return (req: Request): boolean => {
+    if (!token) return true;
+    const h = req.headers.get("authorization") ?? "";
+    const m = h.match(/^Bearer\s+(.+)$/i);
+    if (!m) return false;
+    const got = Buffer.from(m[1]);
+    return got.length === want.length && timingSafeEqual(got, want);
+  };
+}
+
+export function makeFetch(api: ReturnType<typeof buildApi>, token = "") {
+  const authed = makeAuthed(token);
   return async (req: Request): Promise<Response> => {
     const url = new URL(req.url);
     if (req.method !== "GET") return json({ error: "read-only" }, 405);
     const p = url.pathname;
     try {
+      if (p.startsWith("/api/") && !authed(req)) return json({ error: "unauthorized" }, 401);
       if (p === "/api/telemetry") return json(api.telemetry());
       if (p === "/api/nodes") {
         const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? 32) || 32, 1), 200);
@@ -133,19 +156,24 @@ export function makeFetch(api: ReturnType<typeof buildApi>) {
 if (import.meta.main) {
   let args;
   try {
-    args = parseArgs(process.argv.slice(2), ["help"], ["port"]);
+    args = parseArgs(process.argv.slice(2), ["help", "remote"], ["port"]);
   } catch (e) {
     usage(`${(e as Error).message}\n${USAGE}`);
   }
   if (args.flags.has("help") || args.positional.length) usage(USAGE);
   const port = Number(args.opts.get("port") ?? 3131);
   if (!(port > 0 && port < 65536)) usage("--port must be 1–65535");
+  const remote = args.flags.has("remote");
+  const token = process.env.AI_MEMORY_WEB_TOKEN ?? "";
+  if (remote && !token)
+    usage("--remote needs a token: set AI_MEMORY_WEB_TOKEN so /api is gated before you tunnel to it.");
   try {
     const db = openStore({ readonly: true });
     const api = buildApi(db);
-    const server = Bun.serve({ hostname: "127.0.0.1", port, fetch: makeFetch(api) });
+    const server = Bun.serve({ hostname: "127.0.0.1", port, fetch: makeFetch(api, token) });
     const c = api.telemetry().counts; // warms the count cache before the first page load
-    console.log(`▸ ai-memory display on http://127.0.0.1:${server.port}  (loopback only, read-only)`);
+    const mode = token ? "token-gated for tunnel use" : "loopback only, read-only";
+    console.log(`▸ ai-memory display on http://127.0.0.1:${server.port}  (${mode})`);
     console.log(`  ${c.conversations.toLocaleString()} conversations · ${c.messages.toLocaleString()} messages · ${c.files.toLocaleString()} files · ${c.chunks.toLocaleString()} chunks`);
     process.on("SIGINT", () => { server.stop(); db.close(); process.exit(0); });
   } catch (e) {

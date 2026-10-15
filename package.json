@@ -8,6 +8,7 @@
     "push": "bun scripts/push.ts",
     "ingest": "bun scripts/ingest.ts",
     "serve": "bun scripts/serve.ts",
+    "remote": "bash ops/remote.sh",
     "encrypt": "bun scripts/encrypt.ts",
     "forget": "bun scripts/forget.ts",
     "status": "bun scripts/status.ts",

@@ -41,6 +41,31 @@ document.addEventListener('DOMContentLoaded', () => {
   let mouse = { x: null, y: null, isDown: false, draggedNode: null };
   let storeCounts = null;
 
+  // ── access token (only used when the display is reached through a tunnel) ──
+  // Local loopback needs no token; serve.ts gates /api only under --remote.
+  // On a 401 we ask once, keep the token in localStorage, and send it as a
+  // bearer header. Nothing is sent anywhere except this same origin.
+  let authToken = (() => { try { return localStorage.getItem('am_token'); } catch { return null; } })();
+  let askingToken = false, declinedToken = false;
+  async function api(path, opts = {}) {
+    const build = () => ({ ...opts, headers: { ...(opts.headers || {}), ...(authToken ? { Authorization: 'Bearer ' + authToken } : {}) } });
+    let res = await fetch(path, build());
+    if (res.status === 401 && !askingToken && !declinedToken) {
+      askingToken = true;
+      const t = window.prompt('This ai-memory display is token-protected. Paste the access token:');
+      askingToken = false;
+      if (t && t.trim()) {
+        authToken = t.trim();
+        try { localStorage.setItem('am_token', authToken); } catch {}
+        declinedToken = false;
+        res = await fetch(path, build());
+      } else {
+        declinedToken = true; // stop re-prompting on the 3s telemetry loop; reload to retry
+      }
+    }
+    return res;
+  }
+
   if (statHost) statHost.textContent = location.host;
 
   // ── canvas: one node per conversation ──────────────────────────────────
@@ -116,7 +141,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function loadNodes(q) {
     const url = '/api/nodes?limit=48' + (q ? '&q=' + encodeURIComponent(q) : '');
-    const res = await fetch(url);
+    const res = await api(url);
     if (!res.ok) throw new Error('nodes ' + res.status);
     const data = await res.json();
     nodes = data.nodes.map((c, i) => new Node(i, c));
@@ -219,7 +244,7 @@ document.addEventListener('DOMContentLoaded', () => {
   async function fetchTelemetry() {
     const t = performance.now();
     try {
-      const res = await fetch('/api/telemetry');
+      const res = await api('/api/telemetry');
       const data = await res.json();
       if (statLatency) statLatency.textContent = `${Math.round(performance.now() - t)} ms`;
       if (statStatus) statStatus.innerHTML = `<span class="dot-green"></span> ${data.status}${data.encrypted ? ' · ENCRYPTED' : ''}`;
@@ -292,7 +317,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function openConversation(id) {
-    const res = await fetch('/api/conversation/' + encodeURIComponent(id));
+    const res = await api('/api/conversation/' + encodeURIComponent(id));
     if (!res.ok) { appendTerminalMessage('SYSTEM', 'conversation not found'); return; }
     const c = await res.json();
     appendTerminalMessage('SYSTEM', `── ${c.cluster} · ${c.title || '(untitled)'} · ${c.messages.length} messages${c.thread_inferred ? ' · thread inferred' : ''} ──`);
@@ -313,7 +338,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const t0 = performance.now();
     let data;
     try {
-      const res = await fetch('/api/search?q=' + encodeURIComponent(q) + '&limit=8');
+      const res = await api('/api/search?q=' + encodeURIComponent(q) + '&limit=8');
       data = await res.json();
     } catch (e) {
       hideTrace(); appendTerminalMessage('SYSTEM', 'backend unreachable — run: bun scripts/serve.ts'); return;
