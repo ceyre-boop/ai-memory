@@ -200,6 +200,16 @@ function textOf(data: any): string {
   return (data.content ?? []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("\n").trim();
 }
 
+/** One free-form completion through the configured model — the same single
+ *  outbound path as `ask`, reused. `ghostwrite` uses it to draft from SOUL plus
+ *  retrieved snippets. Caller assembles system + user; nothing here touches the
+ *  store or the passphrase. */
+export async function complete(system: string, user: string, maxTokens = 2048): Promise<string> {
+  const cfg = modelConfig();
+  const data = await messages({ model: cfg.model, max_tokens: maxTokens, system, messages: [{ role: "user", content: user }] });
+  return textOf(data);
+}
+
 /** Ask the model for 3 keyword variants of the question. Returns [] on any malformed reply. */
 export async function expandQuestion(question: string): Promise<string[]> {
   const cfg = modelConfig();

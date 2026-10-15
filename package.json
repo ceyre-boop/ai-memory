@@ -5,6 +5,7 @@
   "scripts": {
     "collect": "bun scripts/collect.ts",
     "query": "bun scripts/query.ts",
+    "ghostwrite": "bun scripts/ghostwrite.ts",
     "push": "bun scripts/push.ts",
     "ingest": "bun scripts/ingest.ts",
     "serve": "bun scripts/serve.ts",

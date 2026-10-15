@@ -13,3 +13,6 @@ wip/
 # scheduled standing-review output — quotes from the operator's own record
 reviews/
 embed.log
+
+# SOUL.md — distilled personal profile, quotes the operator's own writing; never in the public repo
+SOUL.md
