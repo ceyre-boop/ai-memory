@@ -40,6 +40,13 @@ Anything that costs money, changes state, or leaves the machine.
 - Outbound API calls
 - Spawning sub-agents
 - Publishing anything
+- Reaching the read-only display from another device (`serve --remote` behind an operator-run
+  tunnel) — **amended 2026-10-14.** The content is Tier-1 recall, unchanged; what the operator
+  approves is the *exposure* of the loopback port beyond this machine. The server still binds
+  `127.0.0.1`; a bearer token gates `/api`; opening the tunnel is a human act that refuses inside an
+  AI coding session (`ops/remote.sh`, same `CLAUDECODE` guard as `push` and `collect`). It adds no
+  autonomous capability and no proactive delivery — the operator still opens the page by choosing to.
+  See `CONSTRAINTS.md`, "The display, and reaching it from another device".
 
 **Standing approval, one exception.** JARVIS's `/api/chat` (`server.ts`) is the product's main path:
 every message the operator sends is itself the approval for the outbound call that answers it — there

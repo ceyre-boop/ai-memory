@@ -94,6 +94,40 @@ Your conversations mention other people: colleagues, friends, family, public fig
 - If someone asks you to remove what you hold about them, `forget` is the mechanism; there is no
   hidden copy to chase.
 
+## The display, and reaching it from another device — amended 2026-10-14
+
+`serve` is the read-only display over the store (`ui/`, `scripts/serve.ts`). It binds
+`127.0.0.1` and only ever binds `127.0.0.1` — it never opens itself on a public interface.
+By default it is loopback: open on this machine, invisible everywhere else. That has not changed,
+and the test that pins the bind address stays.
+
+The operator may reach the display from another device — a phone, a second laptop — **without moving
+the store or the passphrase off this machine**. The mechanism is a tunnel the operator runs
+(`cloudflared` or equivalent) that forwards an outside URL to `127.0.0.1:3131` here. The server still
+binds loopback; the tunnel, running on this same machine, is the only thing that talks to it. The
+database at rest and the passphrase never leave. Only query *results* do, as the display draws them.
+
+Because a tunnel makes the loopback port reachable by anyone who holds the URL, remote mode is gated:
+
+- **A token, or it does not start.** `serve --remote` refuses to run unless `AI_MEMORY_WEB_TOKEN`
+  is set. With it set, every `/api` request must carry `Authorization: Bearer <token>`; without the
+  header the request is `401`. The static page still loads, so the token can be entered in the browser;
+  the data behind it does not. The token is a gate on the socket, not a second encryption — choose a
+  long one, keep it with the passphrase, never in the repo. Plain `serve` (no `--remote`) is unchanged
+  and needs no token.
+- **Still read-only, still no new outbound code.** Remote mode adds a bearer-token check to the
+  existing read-only API and nothing else. It opens no socket of its own — the tunnel is a separate
+  program the operator runs — so the rule that only `lib/ask.ts` and `lib/embed.ts` may open a socket
+  is untouched.
+- **Opening the tunnel is a human act.** Exposing the loopback port beyond this machine stands with
+  `push`, `collect`, and the outbound tools: `ops/remote.sh` refuses to run inside an AI coding session
+  (`CLAUDECODE` set) and prints the commands for the operator to run at their own terminal. A session
+  may run plain loopback `serve`; it may not open the tunnel.
+- **Plaintext in transit is the operator's to accept.** Results travel decrypted through whatever
+  tunnel the operator chose, TLS-terminated at that provider's edge. The store is never exposed, but a
+  snippet the display shows is visible to the tunnel provider while it is in flight. Running the tunnel
+  is the act that accepts this.
+
 ## Rules that every component inherits
 
 - The user supplies the export file. The system never fetches it.
