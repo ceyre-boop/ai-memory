@@ -48,6 +48,15 @@
       </div>
 
       <div class="header-actions">
+        <button id="btn-ghostwrite" class="ghost-btn" title="Draft something in your own voice, from your own record">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 19l7-7 3 3-7 7-3-3z"></path>
+            <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path>
+            <path d="M2 2l7.586 7.586"></path>
+            <circle cx="11" cy="11" r="2"></circle>
+          </svg>
+          <span>Write in my voice</span>
+        </button>
         <button id="btn-voice-toggle" class="icon-btn" title="Toggle Audio Voice Readout">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
             <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
@@ -206,6 +215,61 @@
 
       </section>
     </main>
+  </div>
+
+  <!-- Write-in-my-voice modal: drafts from SOUL + your own record, on screen, never sent -->
+  <div class="ghost-overlay hidden" id="ghost-modal">
+    <div class="ghost-dialog">
+      <div class="ghost-head">
+        <div class="panel-title">
+          <svg class="panel-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 19l7-7 3 3-7 7-3-3z"></path>
+            <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path>
+            <circle cx="11" cy="11" r="2"></circle>
+          </svg>
+          <h2>WRITE IN MY VOICE</h2>
+        </div>
+        <button class="ghost-close" id="ghost-close" title="Close" aria-label="Close">&times;</button>
+      </div>
+
+      <p class="ghost-note">
+        Drafts from <strong>SOUL.md</strong> (how you think and write) plus the snippets search pulls
+        from your own record. It reasons as you — it never invents a belief you haven't stated. This is a
+        draft for your review: it is <strong>not sent, posted, or signed</strong> anywhere.
+      </p>
+
+      <form id="ghost-form" class="ghost-form">
+        <textarea id="ghost-topic" class="ghost-topic" rows="3" placeholder="What should I draft? e.g. a reflection on grace and the self-made mind, or a reply to this prompt…" required></textarea>
+        <div class="ghost-controls">
+          <label class="ghost-k">Ground on
+            <select id="ghost-k">
+              <option value="6">6</option>
+              <option value="8" selected>8</option>
+              <option value="12">12</option>
+              <option value="16">16</option>
+            </select>
+            of your own snippets
+          </label>
+          <button type="submit" class="send-btn" id="ghost-go">
+            <span>Draft in my voice</span>
+          </button>
+        </div>
+      </form>
+
+      <div class="ghost-status hidden" id="ghost-status"></div>
+
+      <div class="ghost-result hidden" id="ghost-result">
+        <div class="ghost-result-head">
+          <span class="vec-label" id="ghost-meta">DRAFT</span>
+          <button class="mode-btn" id="ghost-copy" type="button">Copy</button>
+        </div>
+        <div class="ghost-draft" id="ghost-draft"></div>
+        <details class="ghost-sources">
+          <summary>Grounded on these snippets from your record</summary>
+          <ol id="ghost-snippets"></ol>
+        </details>
+      </div>
+    </div>
   </div>
 
   <script src="app.js"></script>

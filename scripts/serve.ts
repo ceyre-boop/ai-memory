@@ -6,13 +6,20 @@
 //
 // CONSTRAINTS.md: read-only over the store; binds 127.0.0.1; no CORS; the
 // passphrase never leaves the process; results come from the user's own
-// record or say "no matches". Nothing here fetches or generates anything.
+// record or say "no matches". The one generative route is POST /api/ghostwrite
+// (item 10) — it drafts from SOUL + retrieval through lib/ask.ts, opens no new
+// socket, and refuses when the server was started inside an AI coding session.
 import { join } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { timingSafeEqual } from "node:crypto";
-import { openStore, counts, fail, ROOT, DB_PATH, readMeta } from "./lib/db";
+import { openStore, counts, fail, ROOT, DB_PATH, readMeta, StoreError } from "./lib/db";
 import { parseArgs, usage } from "./lib/cli";
+import { complete } from "./lib/ask";
+import { buildSystem, buildUser, requireHumanOperator } from "./lib/ghostwrite";
 import type { Database } from "bun:sqlite";
+
+const REPO = fileURLToPath(new URL("..", import.meta.url)).replace(/\/$/, "");
 
 const USAGE = `
 usage: bun scripts/serve.ts [--port 3131] [--key-file <path>] [--remote]
@@ -42,7 +49,7 @@ const MIME: Record<string, string> = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json; charset=utf-8" } });
 
-import { search, ftsQuery } from "./query";
+import { search, ftsQuery, heading } from "./query";
 
 const CLUSTER: Record<string, string> = { chatgpt: "ChatGPT", claude: "Claude", gemini: "Gemini" };
 
@@ -100,6 +107,26 @@ export function buildApi(db: Database) {
     search(q: string, limit: number, source: "all" | "conv" | "files") {
       return { query: q, results: search(db, q, { limit, source }) };
     },
+    /** The browser surface of `ghostwrite` (CONSTRAINTS.md item 10). Reads the
+     *  store and SOUL.md, assembles the shared prompt, and drafts through the
+     *  one outbound path. Refuses when the server process was started inside an
+     *  AI coding session — a draft comes only from a server the operator ran at
+     *  their own terminal. It drafts; it never delivers. */
+    async ghostwrite(topic: string, k: number) {
+      requireHumanOperator(false);
+      const soulPath = join(REPO, "SOUL.md");
+      if (!existsSync(soulPath))
+        throw new StoreError(`no SOUL profile at ${soulPath} — build SOUL.md from your corpus first.`);
+      const soul = readFileSync(soulPath, "utf8");
+      const hits = search(db, topic, { limit: k });
+      const draft = await complete(buildSystem(soul), buildUser(topic, hits), 2048);
+      return {
+        draft,
+        grounded: hits.length,
+        soul_chars: soul.length,
+        snippets: hits.map((h, i) => ({ n: i + 1, heading: heading(h), score: Number(h.score.toFixed(2)) })),
+      };
+    },
   };
 }
 
@@ -122,10 +149,28 @@ export function makeFetch(api: ReturnType<typeof buildApi>, token = "") {
   const authed = makeAuthed(token);
   return async (req: Request): Promise<Response> => {
     const url = new URL(req.url);
-    if (req.method !== "GET") return json({ error: "read-only" }, 405);
     const p = url.pathname;
+    const isGhost = p === "/api/ghostwrite";
+    // Read-only everywhere except the one generative route, which takes POST.
+    if (req.method !== "GET" && !(req.method === "POST" && isGhost))
+      return json({ error: "read-only" }, 405);
     try {
       if (p.startsWith("/api/") && !authed(req)) return json({ error: "unauthorized" }, 401);
+      if (isGhost) {
+        if (req.method !== "POST") return json({ error: "use POST" }, 405);
+        let body: { topic?: unknown; k?: unknown } = {};
+        try { body = (await req.json()) as typeof body; } catch { /* empty / bad JSON → topic required */ }
+        const topic = typeof body.topic === "string" ? body.topic.trim() : "";
+        if (!topic) return json({ error: "topic required" }, 400);
+        const k = Math.min(Math.max(Number(body.k ?? 8) || 8, 1), 50);
+        try {
+          return json(await api.ghostwrite(topic, k));
+        } catch (e) {
+          const msg = (e as Error).message;
+          // The CLAUDECODE human-act guard is a deliberate refusal (403), not a 500.
+          return json({ error: msg }, msg.includes("AI coding session") ? 403 : 500);
+        }
+      }
       if (p === "/api/telemetry") return json(api.telemetry());
       if (p === "/api/nodes") {
         const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? 32) || 32, 1), 200);

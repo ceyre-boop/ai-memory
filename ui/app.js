@@ -1,7 +1,9 @@
 // ai-memory display — front end for scripts/serve.ts.
 // Every node on the canvas is a real conversation from the encrypted store.
 // The terminal answers with full-text search hits from your own record, or
-// says "no matches". Nothing here is simulated or generated.
+// says "no matches" — nothing there is generated. The one generative action is
+// "Write in my voice" (the ghostwrite modal): it drafts from SOUL + your own
+// retrieved snippets, on screen, and is sent nowhere.
 
 document.addEventListener('DOMContentLoaded', () => {
   const canvas = document.getElementById('neural-canvas');
@@ -365,6 +367,85 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   promptForm.addEventListener('submit', (e) => { e.preventDefault(); handleUserSubmit(promptInput.value); });
+
+  // ── write in my voice (ghostwrite) ───────────────────────────────────────
+  // POSTs to /api/ghostwrite. The server drafts from SOUL.md + your own
+  // retrieved snippets through the single outbound path, and refuses if it was
+  // started inside an AI coding session (CLAUDECODE). The draft shows here and
+  // is sent nowhere — you decide what becomes of it.
+  const ghostModal = document.getElementById('ghost-modal');
+  const ghostForm = document.getElementById('ghost-form');
+  const ghostTopic = document.getElementById('ghost-topic');
+  const ghostK = document.getElementById('ghost-k');
+  const ghostGo = document.getElementById('ghost-go');
+  const ghostStatus = document.getElementById('ghost-status');
+  const ghostResult = document.getElementById('ghost-result');
+  const ghostDraft = document.getElementById('ghost-draft');
+  const ghostMeta = document.getElementById('ghost-meta');
+  const ghostSnippets = document.getElementById('ghost-snippets');
+  const btnGhostwrite = document.getElementById('btn-ghostwrite');
+  const ghostClose = document.getElementById('ghost-close');
+  const ghostCopy = document.getElementById('ghost-copy');
+
+  function openGhost() { if (ghostModal) { ghostModal.classList.remove('hidden'); setTimeout(() => ghostTopic && ghostTopic.focus(), 50); } }
+  function closeGhost() { if (ghostModal) ghostModal.classList.add('hidden'); }
+  function setGhostStatus(msg, kind) {
+    if (!ghostStatus) return;
+    ghostStatus.textContent = msg;
+    ghostStatus.className = 'ghost-status' + (kind ? ' ' + kind : '');
+    ghostStatus.classList.toggle('hidden', !msg);
+  }
+
+  if (btnGhostwrite) btnGhostwrite.addEventListener('click', openGhost);
+  if (ghostClose) ghostClose.addEventListener('click', closeGhost);
+  if (ghostModal) ghostModal.addEventListener('click', (e) => { if (e.target === ghostModal) closeGhost(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeGhost(); });
+
+  if (ghostCopy) ghostCopy.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(ghostDraft.textContent || ''); ghostCopy.textContent = 'Copied'; setTimeout(() => (ghostCopy.textContent = 'Copy'), 1500); }
+    catch { ghostCopy.textContent = 'Copy failed'; setTimeout(() => (ghostCopy.textContent = 'Copy'), 1500); }
+  });
+
+  if (ghostForm) ghostForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const topic = ghostTopic.value.trim();
+    if (!topic) return;
+    const k = Number(ghostK.value) || 8;
+    ghostGo.disabled = true;
+    ghostResult.classList.add('hidden');
+    setGhostStatus('Drafting in your voice — pulling your own prior takes, then writing…', 'working');
+    try {
+      const res = await api('/api/ghostwrite', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ topic, k }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const guard = res.status === 403;
+        setGhostStatus(
+          (guard ? 'Drafting is a human act — this server was started inside an AI coding session, so it won’t draft. Restart it in your own terminal: bun scripts/serve.ts' : (data.error || ('error ' + res.status))),
+          'error',
+        );
+        return;
+      }
+      setGhostStatus('', '');
+      ghostMeta.textContent = `DRAFT · grounded on ${data.grounded} of your snippets · SOUL ${(data.soul_chars || 0).toLocaleString()} chars`;
+      ghostDraft.textContent = data.draft || '(empty draft)';
+      ghostSnippets.innerHTML = '';
+      (data.snippets || []).forEach((s) => {
+        const li = document.createElement('li');
+        li.textContent = `${s.heading}  ·  score ${s.score}`;
+        ghostSnippets.appendChild(li);
+      });
+      ghostResult.classList.remove('hidden');
+      speakText('Draft ready.');
+    } catch (err) {
+      setGhostStatus('backend unreachable — run: bun scripts/serve.ts', 'error');
+    } finally {
+      ghostGo.disabled = false;
+    }
+  });
 
   // ── boot ───────────────────────────────────────────────────────────────
   loadNodes(null)
