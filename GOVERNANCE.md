@@ -54,6 +54,13 @@ Anything that costs money, changes state, or leaves the machine.
   (`CLAUDECODE`-guarded; `--dry` sends nothing). It only ever returns a draft — it never sends, posts,
   or signs as the operator, which stays Tier 3 below. It writes from the record and `SOUL.md`, never a
   belief the record does not support. See `CONSTRAINTS.md` item 10.
+  **Amended 2026-10-18:** the same capability is reachable from the display as `POST /api/ghostwrite`
+  (`scripts/serve.ts`), so the operator can draft from the browser. The tier is unchanged — still
+  outbound, still a human act: the endpoint refuses when the server process was started inside an AI
+  coding session (`CLAUDECODE` set), so a draft is produced only by a server the operator ran at their
+  own terminal. It returns a draft to the screen and never sends, posts, or signs. Unlike JARVIS's
+  `/api/chat` below, it keeps the `CLAUDECODE` guard — drafting as the operator is held to the same
+  human-terminal rule as `ask`, not the standing-approval exception.
 
 **Standing approval, one exception.** JARVIS's `/api/chat` (`server.ts`) is the product's main path:
 every message the operator sends is itself the approval for the outbound call that answers it — there

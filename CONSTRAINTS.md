@@ -127,6 +127,17 @@ Because a tunnel makes the loopback port reachable by anyone who holds the URL, 
   tunnel the operator chose, TLS-terminated at that provider's edge. The store is never exposed, but a
   snippet the display shows is visible to the tunnel provider while it is in flight. Running the tunnel
   is the act that accepts this.
+- **One action on the display is generative, and it is the ghostwrite draft — amended 2026-10-18.**
+  Everything else the display does is read-only over the store. The one exception is
+  `POST /api/ghostwrite`, the browser surface of item 10 below: it reads the store and `SOUL.md`,
+  assembles the same prompt the CLI does, and returns a draft through the one outbound path
+  (`lib/ask.ts`). It writes nothing to the store and opens no new socket — the `fetch` stays in
+  `lib/ask.ts`, and the test that pins the two socket files is untouched. It is bound by every rule
+  item 10 names: it drafts and never delivers; it refuses the real call when the *server process* was
+  started inside an AI coding session (`CLAUDECODE` set), so a draft is produced only by a server the
+  operator ran at their own terminal; it sends only `SOUL.md` and the retrieved snippets, never the
+  passphrase or the whole store. Under `--remote` it sits behind the same bearer token as every other
+  `/api` route.
 
 ## Rules that every component inherits
 
@@ -222,3 +233,10 @@ What it is bound by:
 - **`SOUL.md` is the operator's own record, distilled — not a mind.** It predicts moves from evidence; it
   can be wrong or stale, and it carries no claim of sentience or agency. It is a profile built from the
   operator's writing, kept out of the public repo the same way `reviews/` is.
+- **Reachable from the display, not only the CLI — amended 2026-10-18.** `ghostwrite` is also exposed as
+  `POST /api/ghostwrite` by `scripts/serve.ts`, so the operator can draft from the browser — locally, or
+  tunneled behind the token. It is the identical capability under identical bounds: the prompt assembly
+  is shared code (`scripts/lib/ghostwrite.ts`), the model call is the same single outbound path, and it
+  refuses when the server process was started inside an AI coding session (`CLAUDECODE` set). The draft
+  is returned to the screen and sent, posted, and signed nowhere — the operator decides what becomes of
+  the pages, exactly as with the CLI.
