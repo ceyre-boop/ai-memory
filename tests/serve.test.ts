@@ -145,6 +145,7 @@ test("POST /api/ask needs a question, and answers \"Not in your record.\" withou
   expect((await post({})).status).toBe(400);
   expect((await fetch(base + "/api/ask")).status).toBe(405);
   const d = await (await post({ question: "zzqqxxnomatchtoken" })).json();
-  expect(d.answer).toBe("Not in your record.");
+  expect(d.reply).toBe("Not in your record.");
+  expect(Array.isArray(d.actions)).toBe(true);
   expect(d.grounded).toBe(0);
 });

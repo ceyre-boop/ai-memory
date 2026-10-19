@@ -1,0 +1,9 @@
+{
+  "shortcuts": [
+    {
+      "name": "Jarvis Ping",
+      "purpose": "Test shortcut: shows a notification 'Jarvis ping ok'",
+      "inputs": "none"
+    }
+  ]
+}

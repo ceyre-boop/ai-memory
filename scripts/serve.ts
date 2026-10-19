@@ -18,6 +18,7 @@ import { timingSafeEqual } from "node:crypto";
 import { openStore, counts, fail, ROOT, DB_PATH, readMeta, StoreError } from "./lib/db";
 import { parseArgs, usage } from "./lib/cli";
 import { complete, ask } from "./lib/ask";
+import { loadRegistry, buildActionsMessage, parseActions, ACTIONS_SYSTEM_PROMPT, type Action } from "./lib/actions";
 import { buildSystem, buildUser, requireHumanOperator } from "./lib/ghostwrite";
 import type { Database } from "bun:sqlite";
 
@@ -109,13 +110,21 @@ export function buildApi(db: Database) {
     search(q: string, limit: number, source: "all" | "conv" | "files") {
       return { query: q, results: search(db, q, { limit, source }) };
     },
-    /** The remote surface of `ask.ts`: one question, answered only from retrieved
-     *  snippets. No hits → no model call, "Not in your record." */
-    async ask(question: string, k: number) {
-      const hits = search(db, question, { limit: k });
-      if (!hits.length) return { answer: "Not in your record.", grounded: 0, sources: [] as { n: number; heading: string }[] };
-      const r = await ask(question, hits);
-      return { answer: r.answer, model: r.model, grounded: hits.length, sources: hits.map((h, i) => ({ n: i + 1, heading: heading(h) })) };
+    /** The remote surface of `ask.ts` for the phone: one message, answered only from
+     *  retrieved snippets (no hits → no answer call, "Not in your record."), plus
+     *  validated actions[] the phone dispatches. Nothing here executes an action. */
+    async ask(message: string, k: number) {
+      const registry = loadRegistry();
+      const hits = search(db, message, { limit: k });
+      const r = hits.length ? await ask(message, hits) : null;
+      let actions: Action[] = [];
+      try { actions = parseActions(await complete(ACTIONS_SYSTEM_PROMPT, buildActionsMessage(message, registry), 512), registry); } catch { /* no actions on planner failure */ }
+      return {
+        reply: r ? r.answer : "Not in your record.",
+        actions,
+        grounded: hits.length,
+        sources: hits.map((h, i) => ({ n: i + 1, heading: heading(h) })),
+      };
     },
     /** The browser surface of `ghostwrite` (CONSTRAINTS.md item 10). Reads the
      *  store and SOUL.md, assembles the shared prompt, and drafts through the
@@ -184,12 +193,13 @@ export function makeFetch(api: ReturnType<typeof buildApi>, token = "") {
       }
       if (isAsk) {
         if (req.method !== "POST") return json({ error: "use POST" }, 405);
-        let body: { question?: unknown; k?: unknown } = {};
+        let body: { message?: unknown; question?: unknown; image_b64?: unknown; k?: unknown } = {};
         try { body = (await req.json()) as typeof body; } catch { /* empty / bad JSON → question required */ }
-        const question = typeof body.question === "string" ? body.question.trim() : "";
-        if (!question) return json({ error: "question required" }, 400);
+        const raw = body.message ?? body.question;
+        const question = typeof raw === "string" ? raw.trim() : "";
+        if (!question) return json({ error: "message required" }, 400);
         const k = Math.min(Math.max(Number(body.k ?? 8) || 8, 1), 50);
-        return json(await api.ask(question, k));
+        return json({ ...(await api.ask(question, k)), ...(body.image_b64 ? { image: "ignored: no vision path in this server" } : {}) });
       }
       if (p === "/api/telemetry") return json(api.telemetry());
       if (p === "/api/nodes") {
