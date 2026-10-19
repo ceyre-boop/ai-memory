@@ -139,3 +139,12 @@ test("--remote without a token refuses to start", () => {
   expect(r.exitCode).not.toBe(0);
   expect(r.stderr.toString()).toContain("AI_MEMORY_WEB_TOKEN");
 });
+
+test("POST /api/ask needs a question, and answers \"Not in your record.\" without a model call when nothing matches", async () => {
+  const post = (b: unknown) => fetch(base + "/api/ask", { method: "POST", body: JSON.stringify(b) });
+  expect((await post({})).status).toBe(400);
+  expect((await fetch(base + "/api/ask")).status).toBe(405);
+  const d = await (await post({ question: "zzqqxxnomatchtoken" })).json();
+  expect(d.answer).toBe("Not in your record.");
+  expect(d.grounded).toBe(0);
+});

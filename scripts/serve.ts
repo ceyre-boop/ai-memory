@@ -9,13 +9,15 @@
 // record or say "no matches". The one generative route is POST /api/ghostwrite
 // (item 10) — it drafts from SOUL + retrieval through lib/ask.ts, opens no new
 // socket, and refuses when the server was started inside an AI coding session.
+// POST /api/ask is the same one-question act as `ask.ts`: retrieve, answer from the
+// snippets only, cite them. Pull-only; it drafts nothing and delivers nothing.
 import { join } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { timingSafeEqual } from "node:crypto";
 import { openStore, counts, fail, ROOT, DB_PATH, readMeta, StoreError } from "./lib/db";
 import { parseArgs, usage } from "./lib/cli";
-import { complete } from "./lib/ask";
+import { complete, ask } from "./lib/ask";
 import { buildSystem, buildUser, requireHumanOperator } from "./lib/ghostwrite";
 import type { Database } from "bun:sqlite";
 
@@ -107,6 +109,14 @@ export function buildApi(db: Database) {
     search(q: string, limit: number, source: "all" | "conv" | "files") {
       return { query: q, results: search(db, q, { limit, source }) };
     },
+    /** The remote surface of `ask.ts`: one question, answered only from retrieved
+     *  snippets. No hits → no model call, "Not in your record." */
+    async ask(question: string, k: number) {
+      const hits = search(db, question, { limit: k });
+      if (!hits.length) return { answer: "Not in your record.", grounded: 0, sources: [] as { n: number; heading: string }[] };
+      const r = await ask(question, hits);
+      return { answer: r.answer, model: r.model, grounded: hits.length, sources: hits.map((h, i) => ({ n: i + 1, heading: heading(h) })) };
+    },
     /** The browser surface of `ghostwrite` (CONSTRAINTS.md item 10). Reads the
      *  store and SOUL.md, assembles the shared prompt, and drafts through the
      *  one outbound path. Refuses when the server process was started inside an
@@ -151,8 +161,9 @@ export function makeFetch(api: ReturnType<typeof buildApi>, token = "") {
     const url = new URL(req.url);
     const p = url.pathname;
     const isGhost = p === "/api/ghostwrite";
+    const isAsk = p === "/api/ask";
     // Read-only everywhere except the one generative route, which takes POST.
-    if (req.method !== "GET" && !(req.method === "POST" && isGhost))
+    if (req.method !== "GET" && !(req.method === "POST" && (isGhost || isAsk)))
       return json({ error: "read-only" }, 405);
     try {
       if (p.startsWith("/api/") && !authed(req)) return json({ error: "unauthorized" }, 401);
@@ -170,6 +181,15 @@ export function makeFetch(api: ReturnType<typeof buildApi>, token = "") {
           // The CLAUDECODE human-act guard is a deliberate refusal (403), not a 500.
           return json({ error: msg }, msg.includes("AI coding session") ? 403 : 500);
         }
+      }
+      if (isAsk) {
+        if (req.method !== "POST") return json({ error: "use POST" }, 405);
+        let body: { question?: unknown; k?: unknown } = {};
+        try { body = (await req.json()) as typeof body; } catch { /* empty / bad JSON → question required */ }
+        const question = typeof body.question === "string" ? body.question.trim() : "";
+        if (!question) return json({ error: "question required" }, 400);
+        const k = Math.min(Math.max(Number(body.k ?? 8) || 8, 1), 50);
+        return json(await api.ask(question, k));
       }
       if (p === "/api/telemetry") return json(api.telemetry());
       if (p === "/api/nodes") {
