@@ -264,6 +264,9 @@ neither can reach the store.
       from the operator's record, not by or for the operator. The API sends, posts, and signs nothing.
       Handing a key to another assistant lets that assistant request drafts; whether it submits one
       anywhere is that assistant's act and the operator's to review.
+    - **A draft may not replay the owner's samples.** A draft sharing any 12-word run with the voice's own
+      frozen samples is withheld, and failures reach callers only as fixed strings, never upstream text.
+      One request in flight per key; failed-auth throttling never blocks a valid key.
     - **No content in the audit log.** `~/.config/jarvis/api-audit.log` records time, key name, voice,
       request length, outcome. Never the request text, the readings, or the draft.
     - **Opening it beyond the machine is a human act.** The process binds loopback. A tunnel the operator
