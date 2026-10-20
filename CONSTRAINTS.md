@@ -240,3 +240,43 @@ What it is bound by:
   refuses when the server process was started inside an AI coding session (`CLAUDECODE` set). The draft
   is returned to the screen and sent, posted, and signed nowhere — the operator decides what becomes of
   the pages, exactly as with the CLI.
+
+## The public page and the voice API — amended 2026-10-19
+
+Two things leave the machine's loopback that did not before: a public web page about the JARVIS
+dashboard, and a narrow, key-gated API over the operator's voices. Neither is the display, and
+neither can reach the store.
+
+11. **The public page is static and holds nothing.** It is HTML, CSS, and JavaScript on Vercel: what the
+    product is, and a thin client that pairs back to the operator's machine with a URL and token the
+    visitor types. No store, no `SOUL.md`, no key, no conversation, no sample of the operator's writing
+    is ever deployed. `scripts/deploy-ui.sh` (in the app repo) stages an allowlist of files; anything
+    not on it does not go up.
+12. **The voice API is three operations, not the app.** `scripts/ext-api.ts` (app repo) is its own
+    process on `127.0.0.1`. A caller with a key may: list the voices that key is allowed, ask for one
+    piece in an allowed voice, and fetch the result of that request. It cannot reach chats, memory,
+    the vault, uploads, personas, sessions, or any other route of the app; those are not proxied.
+    - **Keys are the approval, and issuing one is a human act.** `ops/api-key.ts` refuses inside an AI
+      coding session (`CLAUDECODE` set). A key is shown once and stored only as a SHA-256 hash outside
+      the repo (`~/.config/jarvis/api-keys.json`). Each key carries a voice allowlist, a daily request
+      cap, and can be revoked; a revoked, unknown, or exhausted key gets `401`/`429` and nothing else.
+    - **Drafts, never delivery.** Every response is marked as a draft and says it was written in a voice
+      from the operator's record, not by or for the operator. The API sends, posts, and signs nothing.
+      Handing a key to another assistant lets that assistant request drafts; whether it submits one
+      anywhere is that assistant's act and the operator's to review.
+    - **No content in the audit log.** `~/.config/jarvis/api-audit.log` records time, key name, voice,
+      request length, outcome. Never the request text, the readings, or the draft.
+    - **Opening it beyond the machine is a human act.** The process binds loopback. A tunnel the operator
+      runs, behind the Vercel gateway or directly, is what makes it reachable; `scripts/remote.sh`
+      already refuses inside an AI coding session and the same holds here. The gateway on Vercel is a
+      pass-through: it holds no keys, no store, no output, and an origin URL it cannot reach returns
+      `503`, not data.
+    - **Same outbound path as the app.** The model call is the one the app already makes for voices;
+      no new socket-opening file in the memory repo, and the test pinning that is untouched.
+13. **Voices share the author, not the format.** Every voice but the everyday one (`colin/chat`) adds a
+    second layer to its prompt (`voiceprint/prose/core.ts`): sentences from the operator's own everyday
+    writing chosen for the request, what marks that writing against generic AI, and the operator's own
+    cuts and rewrites from edits to *other* voices. The measured bands still govern form and still gate
+    the output; this layer governs word choice and stance. Typing slips (typos, lowercase "i", missing
+    apostrophes) are excluded so they are not taught as language. It sends the operator's own words to
+    the same provider through the same single call, nothing new and nothing to a new destination.

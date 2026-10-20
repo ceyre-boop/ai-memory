@@ -62,6 +62,14 @@ Anything that costs money, changes state, or leaves the machine.
   `/api/chat` below, it keeps the `CLAUDECODE` guard — drafting as the operator is held to the same
   human-terminal rule as `ask`, not the standing-approval exception.
 
+- The voice API and the public page — **amended 2026-10-19.** A caller holding an operator-issued key can
+  request drafts in the voices that key allows, over three operations and nothing else; a static public
+  page describes the product and pairs back to the operator's machine. The operator approves by issuing a
+  key (a `CLAUDECODE`-guarded human act, revocable, capped per day, hashed at rest) and by opening the
+  tunnel. It returns drafts and never sends, posts, or signs; whatever another assistant does with a draft
+  is that assistant's act, which is why the key is scoped to named voices and capped. See `CONSTRAINTS.md`
+  items 11–13.
+
 **Standing approval, one exception.** JARVIS's `/api/chat` (`server.ts`) is the product's main path:
 every message the operator sends is itself the approval for the outbound call that answers it — there
 is no separate confirmation step, and gating one behind the other would break the thing being demoed.
